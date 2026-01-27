@@ -92,6 +92,7 @@ Edit `openauth.config.ts` to set up your authentication settings:
 export default async (env: Env) =>
   createExternalGlobalProjectConfig({
     register: {
+      fallbackEmailFrom: "fallback@example.com",
       strategy: {
         email: {
           provider: "custom", // "custom" | "resend"
