@@ -7,10 +7,8 @@ export default async (env: Env) =>
     register: {
       strategy: {
         email: {
-          provider: "custom",
-          sendEmailFunction(to, code) {
-            console.log(`Send code ${code} to email ${to}`);
-          },
+          provider: "resend",
+          apiKey: env.RESEND_API_KEY,
         },
       },
     },
