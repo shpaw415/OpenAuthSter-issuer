@@ -7,8 +7,8 @@
   "d1_databases": [
     {
       "binding": "AUTH_DB",
-      "database_name": "openauth-db",
-      "database_id": "0ac321d7-1d05-49f8-b900-5e29cfae6c8c",
+      "database_name": "<YOUR_D1_DATABASE_NAME>",
+      "database_id": "<YOUR_D1_DATABASE_ID>",
       "migrations_dir": "drizzle/migrations",
       "remote": true
     }
