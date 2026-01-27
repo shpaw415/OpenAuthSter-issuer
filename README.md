@@ -42,7 +42,11 @@ cd OpenAuthSter-issuer
 bun install
 ```
 
-### 3. Create D1 Database
+### 3. Rename wrangler.example.json
+
+Rename or create `wrangler.example.json` > `wrangler.json`
+
+### 4. Create D1 Database
 
 Create a new D1 database in your Cloudflare dashboard or via CLI:
 
@@ -50,7 +54,7 @@ Create a new D1 database in your Cloudflare dashboard or via CLI:
 wrangler d1 create openauth-db
 ```
 
-### 4. Configure Wrangler
+### 5. Configure Wrangler
 
 Update your `wrangler.json` with the database credentials:
 
@@ -68,7 +72,7 @@ Update your `wrangler.json` with the database credentials:
 
 > 💡 Copy the `database_name` and `database_id` from the output of the `wrangler d1 create` command
 
-### 5. Run Database Migrations
+### 6. Run Database Migrations
 
 Apply the database schema to your D1 database:
 
@@ -76,7 +80,7 @@ Apply the database schema to your D1 database:
 wrangler d1 migrations apply AUTH_DB --remote
 ```
 
-### 6. Configure OpenAuth
+### 7. Configure OpenAuth
 
 Edit `openauth.config.ts` to set up your authentication settings:
 
@@ -108,7 +112,7 @@ export const subjects = createSubjects({
 });
 ```
 
-### 7. Deploy
+### 8. Deploy
 
 Deploy to Cloudflare Workers:
 
