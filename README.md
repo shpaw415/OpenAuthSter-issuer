@@ -151,13 +151,13 @@ openauth-multitenant-server/
 
 After deploying the issuer, set up the WebUI to manage your projects:
 
-👉 [OpenAuthster WebUI](https://github.com/shpaw415/openauth-webui)
+👉 [OpenAuthster WebUI](https://github.com/shpaw415/OpenAuthSter-webUI)
 
 ## Related Repositories
 
 - [OpenAuthster](https://github.com/shpaw415/openauthster) - Main project documentation
-- [OpenAuthster WebUI](https://github.com/shpaw415/openauth-webui) - Management dashboard
-- [Shared Types](https://github.com/shpaw415/openauth-webui-shared-types) - TypeScript types and client SDK
+- [OpenAuthster WebUI](https://github.com/shpaw415/OpenAuthSter-webUI) - Management dashboard
+- [Shared Types](https://github.com/shpaw415/OpenAuthSter-shared) - TypeScript types and client SDK
 - [React SDK](https://github.com/shpaw415/openauth-react) - React integration (WIP)
 
 ## License
