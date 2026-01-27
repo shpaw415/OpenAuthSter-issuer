@@ -42,9 +42,10 @@ cd OpenAuthSter-issuer
 bun install
 ```
 
-### 3. Rename wrangler.example.json
+### 3. Rename wrangler.example.json and run the types
 
-Rename or create `wrangler.example.json` > `wrangler.json`
+Rename or create `wrangler.example.json` > `wrangler.json`.
+Run `wrangler types`
 
 ### 4. Create D1 Database
 
@@ -114,21 +115,27 @@ export const subjects = createSubjects({
 
 ### 8. Deploy
 
-Deploy to Cloudflare Workers:
+create a new private repo on your github dashboard.
+this way you can manage versioning direclty from git.
 
 ```bash
-wrangler deploy
+git remote add cloudflare https://github.com/my-username/my-private-auth-issuer.git
+git add .
+git commit -m "setup"
+git push --set-upstream cloudflare
 ```
+
+go to your Cloudflare dashboard and create a new worker and link it with your newly created Repo.
 
 ## Development
 
 Run the issuer locally for development:
 
 ```bash
-wrangler dev
+wrangler dev --port 8788
 ```
 
-The server will be available at `http://localhost:8787`
+The server will be available at `http://localhost:8788`
 
 ## Project Structure
 
