@@ -5,6 +5,7 @@ import { createExternalGlobalProjectConfig } from "openauth-webui-shared-types";
 export default async (env: Env) =>
   createExternalGlobalProjectConfig({
     register: {
+      fallbackEmailFrom: "fallback@example.com",
       strategy: {
         email: {
           provider: "custom",
