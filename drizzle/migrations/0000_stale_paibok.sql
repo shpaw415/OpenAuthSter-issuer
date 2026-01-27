@@ -28,6 +28,7 @@ CREATE TABLE `openauth_webui_projects` (
 	`active` integer DEFAULT true,
 	`providers_data` text DEFAULT '[]',
 	`themeId` text,
+	`codeMode` text,
 	`emailTemplateId` text,
 	`projectData` text DEFAULT '{}'
 );
