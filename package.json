@@ -27,9 +27,9 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "0.45.1",
     "mustache": "^4.2.0",
+    "openauth-webui-shared-types": "https://github.com/shpaw415/OpenAuthSter-shared.git",
     "resend": "^6.8.0",
-    "valibot": "1.2.0",
-    "openauth-webui-shared-types": "https://github.com/shpaw415/OpenAuthSter-shared.git"
+    "valibot": "1.2.0"
   },
   "private": true,
   "scripts": {

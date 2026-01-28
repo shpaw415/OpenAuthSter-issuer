@@ -27,9 +27,11 @@ import { SlackConfig } from "@openauthjs/openauth/provider/slack";
 export async function generateProvidersFromConfig({
   project,
   env,
+  copyTemplateId,
 }: {
   project: Project;
   env: Env;
+  copyTemplateId: string | null;
 }): Promise<Record<string, Provider<any>>> {
   let globalConfig: ExternalGlobalProjectConfig | undefined = undefined;
   const getSetGlobal = async () => {
@@ -50,6 +52,7 @@ export async function generateProvidersFromConfig({
                   env,
                   globalConfig: await getSetGlobal(),
                   project,
+                  copyTemplateId,
                 }),
               };
             case "oidc":
@@ -111,6 +114,7 @@ export async function generateProvidersFromConfig({
                   providerConfig,
                   env,
                   project,
+                  copyTemplateId,
                 }),
               };
             case "microsoft":
@@ -302,11 +306,13 @@ async function createPasswordProvider({
   providerConfig,
   env,
   project,
+  copyTemplateId,
 }: {
   globalConfig: ExternalGlobalProjectConfig;
   providerConfig: PasswordProviderConfig;
   env: Env;
   project: Project;
+  copyTemplateId: string | null;
 }) {
   return (
     await import("@openauthjs/openauth/provider/password")
@@ -331,7 +337,7 @@ async function createPasswordProvider({
         }
       },
       copy: await getCopyTemplateFromId<"password">(
-        project.emailTemplateId ?? null,
+        copyTemplateId ?? null,
         env,
       ),
       validatePassword(password) {
@@ -378,13 +384,15 @@ async function createCodeProvider({
   env,
   globalConfig,
   project,
+  copyTemplateId,
 }: {
   env: Env;
   globalConfig: ExternalGlobalProjectConfig;
   project: Project;
+  copyTemplateId: string | null;
 }) {
   const copyData = await getCopyTemplateFromId<"code">(
-    project.emailTemplateId ?? null,
+    copyTemplateId ?? null,
     env,
   );
   const codeUI = (await import("@openauthjs/openauth/ui/code")).CodeUI({

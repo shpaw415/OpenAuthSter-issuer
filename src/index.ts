@@ -1,7 +1,12 @@
 import { issuer } from "@openauthjs/openauth";
 import { D1Storage } from "./db/d1-adapter";
 
-import { COOKIE_NAME, createCookieContent } from "./share";
+import {
+  COOKIE_COPY_TEMPLATE_ID,
+  COOKIE_NAME,
+  createClientIdCookieContent,
+  createCookieContent,
+} from "./share";
 import { parseDBProject, Project } from "openauth-webui-shared-types";
 
 import DefaultTheme from "./defaults/theme";
@@ -12,7 +17,7 @@ import {
 } from "openauth-webui-shared-types/database";
 import { drizzle, eq } from "openauth-webui-shared-types/drizzle";
 import { Theme } from "@openauthjs/openauth/ui/theme";
-import { subjects } from "../openauth.config";
+import globalOpenAutsterConfig, { subjects } from "../openauth.config";
 import packageJson from "../package.json" assert { type: "json" };
 import { generateProvidersFromConfig } from "./providers-setup";
 
@@ -24,12 +29,29 @@ export default {
     }
     const url = new URL(request.url);
     const headers = new Headers();
-    const client_id =
-      url.searchParams.get("client_id") || getClientIdFromCookies(request);
+
+    // [0]: project_id, [1]: CopyId;
+    const queryData = url.searchParams.get("client_id")?.split("::") as
+      | [string, string | undefined]
+      | null;
+
+    const cookies = getCookiesFromRequest(request);
+    const client_id = queryData?.[0] || getClientIdFromCookies(cookies);
+    const copyTemplateId =
+      queryData?.[1] || cookies[COOKIE_COPY_TEMPLATE_ID] || null;
 
     if (!client_id) return new Response("Missing client_id", { status: 400 });
-    else if (client_id)
-      headers.append("Set-Cookie", createCookieContent(client_id));
+    else if (client_id || copyTemplateId)
+      headers.append(
+        "Set-Cookie",
+        [
+          createClientIdCookieContent(client_id),
+          copyTemplateId &&
+            createCookieContent(COOKIE_COPY_TEMPLATE_ID, copyTemplateId),
+        ]
+          .filter(Boolean)
+          .join("; "),
+      );
 
     const project = await getProjectById(client_id, env);
     if (!project) {
@@ -56,8 +78,6 @@ export default {
       }
     }
 
-    const copyTemplateId = request.headers.get("X-OpenAuth-Copy-ID");
-
     const res = await issuer({
       storage: D1Storage({
         database: env.AUTH_DB,
@@ -67,9 +87,15 @@ export default {
       providers: await generateProvidersFromConfig({
         project,
         env,
+        copyTemplateId,
       }),
       theme: await getThemeFromProject(project, env),
-      success: async (ctx, value) => {
+      success: async (ctx, value, request) => {
+        console.log(`Successful authentication with value: `, value);
+
+        await (
+          await globalOpenAutsterConfig(env)
+        ).register.onSuccessfulRegistration?.(ctx, value, request);
         return ctx.subject("user", {
           id: await getOrCreateUser(env, value.email, client_id),
         });
@@ -92,18 +118,23 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-function getClientIdFromCookies(request: Request): string | null {
-  const cookieHeader = request.headers.get("cookie");
-  if (!cookieHeader) return null;
+function getClientIdFromCookies(
+  cookies: Record<string, string>,
+): string | null {
+  return cookies[COOKIE_NAME] || null;
+}
 
-  const cookies = cookieHeader.split(";").map((cookie) => cookie.trim());
-  for (const cookie of cookies) {
-    const [name, value] = cookie.split("=");
-    if (name === COOKIE_NAME) {
-      return value;
+function getCookiesFromRequest(request: Request): Record<string, string> {
+  const cookieHeader = request.headers.get("cookie");
+  const cookies: Record<string, string> = {};
+  if (cookieHeader) {
+    const cookiePairs = cookieHeader.split(";");
+    for (const pair of cookiePairs) {
+      const [name, value] = pair.trim().split("=");
+      cookies[name] = value;
     }
   }
-  return null;
+  return cookies;
 }
 
 async function getOrCreateUser(
