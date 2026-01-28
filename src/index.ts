@@ -41,8 +41,6 @@ export default {
     const client_id = clientIDParams?.[0] || getClientIdFromCookies(cookies);
     const copyTemplateId = clientIDParams?.[1] || getCopyIdFromCookies(cookies);
 
-    console.log({ cookies, client_id, copyTemplateId });
-
     if (!client_id) return new Response("Missing client_id", { status: 400 });
     else if (client_id || copyTemplateId)
       headers.append("Set-Cookie", createClientIdCookieContent(client_id));
@@ -139,30 +137,28 @@ function getCookiesFromRequest(request: Request): Record<string, string> {
 
 async function getOrCreateUser(
   env: Env,
-  email: string,
+  value: Record<string, any>,
   clientId: string,
 ): Promise<string> {
   const usersTable = OTFusersTable(clientId);
+
   const result = (
     await drizzle(env.AUTH_DB)
       .insert(usersTable)
       .values({
-        email,
-        id: crypto.randomUUID(),
-        data: JSON.stringify({}),
+        id: crypto.randomUUID() + crypto.randomUUID(),
+        data: JSON.stringify(value),
         created_at: new Date().toISOString(),
-      })
-      .onConflictDoUpdate({
-        set: { email: email },
-        target: usersTable.email,
       })
       .returning({ id: usersTable.id, data: usersTable.data })
   ).at(0);
 
   if (!result) {
-    throw new Error(`Unable to process user: ${email}`);
+    throw new Error(`Unable to process user: ${JSON.stringify(value)}`);
   }
-  console.log(`Found or created user ${result.id} with email ${email}`);
+  console.log(
+    `Found or created user ${result.id} with data ${JSON.stringify(value)}`,
+  );
   return result.id;
 }
 
