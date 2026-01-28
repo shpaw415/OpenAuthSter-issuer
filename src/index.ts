@@ -29,10 +29,14 @@ export default {
     }
     const url = new URL(request.url);
     const headers = new Headers();
+    // [0]: client_id [1]: copyID
+    const clientIDParams = url.searchParams.get("client_id")?.split("::") as
+      | [string, string | null]
+      | null;
 
     const cookies = getCookiesFromRequest(request);
     const client_id = getClientIdFromCookies(cookies);
-    const copyTemplateId = getCopyIdFromCookies(cookies);
+    const copyTemplateId = clientIDParams?.[1] || getCopyIdFromCookies(cookies);
 
     if (!client_id) return new Response("Missing client_id", { status: 400 });
     else if (client_id || copyTemplateId)
