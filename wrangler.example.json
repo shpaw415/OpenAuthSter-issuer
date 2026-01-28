@@ -18,6 +18,7 @@
   },
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    "WEBUI_ADMIN_EMAILS": "email1@example.com,email2@example.com"
+    "WEBUI_ADMIN_EMAILS": "email1@example.com,email2@example.com",
+    "WEBUI_ORIGIN_URL": "http://localhost:3001"
   }
 }

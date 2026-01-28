@@ -15,6 +15,13 @@
       "when": 1769621040307,
       "tag": "0001_charming_celestials",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1769633733901,
+      "tag": "0002_naive_umar",
+      "breakpoints": true
     }
   ]
 }

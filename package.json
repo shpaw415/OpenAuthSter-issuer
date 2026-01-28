@@ -39,7 +39,8 @@
     "db:generate": "bun --bun drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply AUTH_DB --remote",
     "git:deploy": "git push cloudflare setup",
-    "git:upgrade": "git pull origin main && git merge origin main && bun update openauth-webui-shared-types"
+    "git:upgrade": "git pull origin main && git merge origin main && bun update openauth-webui-shared-types",
+    "update:share": "bun update openauth-webui-shared-types"
   },
   "exports": {
     ".": "./src/index.ts",

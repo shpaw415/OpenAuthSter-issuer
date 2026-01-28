@@ -38,6 +38,9 @@ export default {
 
     const headers = new Headers();
 
+    headers.set("Access-Control-Allow-Credentials", "true");
+    headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+
     if (!client_id) return new Response("Missing client_id", { status: 400 });
     else if (client_id || copyTemplateId)
       headers.append("Set-Cookie", createClientIdCookieContent(client_id));
@@ -106,20 +109,14 @@ export default {
     headers.forEach((value, key) => {
       res.headers.append(key, value);
     });
+    res.headers.set(
+      "Access-Control-Allow-Origin",
+      project.originURL || env.WEBUI_ORIGIN_URL,
+    );
 
     return res;
   },
 } satisfies ExportedHandler<Env>;
-
-function getClientIdFromCookies(
-  cookies: Record<string, string>,
-): string | null {
-  return cookies[COOKIE_NAME] || null;
-}
-
-function getCopyIdFromCookies(cookies: Record<string, string>): string | null {
-  return cookies[COOKIE_COPY_TEMPLATE_ID] || null;
-}
 
 function getCookiesFromRequest(request: Request): Record<string, string> {
   const cookieHeader = request.headers.get("cookie");
