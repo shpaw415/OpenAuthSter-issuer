@@ -156,6 +156,12 @@ async function getOrCreateUser(
         data: JSON.stringify(value),
         created_at: new Date().toISOString(),
       })
+      .onConflictDoUpdate({
+        target: usersTable.identifier,
+        set: {
+          data: JSON.stringify(value),
+        },
+      })
       .returning({ id: usersTable.id })
   ).at(0);
 
