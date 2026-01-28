@@ -35,7 +35,9 @@
   "scripts": {
     "check": "tsc && wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "db:generate": "bun --bun drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply AUTH_DB --remote"
   },
   "exports": {
     ".": "./src/index.ts",

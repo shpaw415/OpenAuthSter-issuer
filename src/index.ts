@@ -23,6 +23,7 @@ import { Theme } from "@openauthjs/openauth/ui/theme";
 import globalOpenAutsterConfig, { subjects } from "../openauth.config";
 import packageJson from "../package.json" assert { type: "json" };
 import { generateProvidersFromConfig } from "./providers-setup";
+import UserSetup from "./user-setup";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
@@ -90,6 +91,7 @@ export default {
         await (
           await globalOpenAutsterConfig(env)
         ).register.onSuccessfulRegistration?.(ctx, value, request);
+
         return ctx.subject("user", {
           id: await getOrCreateUser(env, value.email, client_id),
           data: value,
@@ -142,12 +144,15 @@ async function getOrCreateUser(
   clientId: string,
 ): Promise<string> {
   const usersTable = OTFusersTable(clientId);
-
+  const identifier = UserSetup.extractIdentifierFor[
+    value.provider as keyof typeof UserSetup.extractIdentifierFor
+  ](value as any);
   const result = (
     await drizzle(env.AUTH_DB)
       .insert(usersTable)
       .values({
         id: crypto.randomUUID() + crypto.randomUUID(),
+        identifier,
         data: JSON.stringify(value),
         created_at: new Date().toISOString(),
       })
