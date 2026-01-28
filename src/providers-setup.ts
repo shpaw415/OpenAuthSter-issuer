@@ -236,7 +236,7 @@ async function sendCodeWithSMS({
   switch (globalConfig.register.strategy.phone?.provider) {
     case "twilio":
       const twilioConfig = globalConfig.register.strategy.phone;
-      await sendTwilioSMS({
+      const res = await sendTwilioSMS({
         accountSid: twilioConfig.accountSID,
         authToken: twilioConfig.authToken,
         to,
@@ -249,6 +249,7 @@ async function sendCodeWithSMS({
           },
         ),
       });
+      console.log("Twilio SMS log:", res);
       break;
     case "custom":
       await globalConfig.register.strategy.phone.sendSMSFunction(to, code);
@@ -399,7 +400,7 @@ async function createCodeProvider({
     copy: copyData,
     mode: project.codeMode,
     sendCode: async (claim, code) => {
-      console.log(`Code for ${claim}: ${code}`);
+      console.log({ claim, code });
       switch (project.codeMode) {
         case "email":
           if (!claim.email) {

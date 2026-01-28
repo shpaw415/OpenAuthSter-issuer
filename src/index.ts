@@ -1,7 +1,10 @@
 import { issuer } from "@openauthjs/openauth";
 import { D1Storage } from "./db/d1-adapter";
 
-import { createClientIdCookieContent, createCookieContent } from "./share";
+import {
+  createClientIdCookieContent,
+  createCopyIdCookieContent,
+} from "./share";
 import {
   parseDBProject,
   Project,
@@ -35,21 +38,16 @@ export default {
       | null;
 
     const cookies = getCookiesFromRequest(request);
-    const client_id = getClientIdFromCookies(cookies);
+    const client_id = clientIDParams?.[0] || getClientIdFromCookies(cookies);
     const copyTemplateId = clientIDParams?.[1] || getCopyIdFromCookies(cookies);
+
+    console.log({ cookies, client_id, copyTemplateId });
 
     if (!client_id) return new Response("Missing client_id", { status: 400 });
     else if (client_id || copyTemplateId)
-      headers.append(
-        "Set-Cookie",
-        [
-          createClientIdCookieContent(client_id),
-          copyTemplateId &&
-            createCookieContent(COOKIE_COPY_TEMPLATE_ID, copyTemplateId),
-        ]
-          .filter(Boolean)
-          .join("; "),
-      );
+      headers.append("Set-Cookie", createClientIdCookieContent(client_id));
+    if (copyTemplateId)
+      headers.append("Set-Cookie", createCopyIdCookieContent(copyTemplateId));
 
     const project = await getProjectById(client_id, env);
     if (!project) {
