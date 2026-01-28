@@ -47,8 +47,11 @@ export default {
       url.pathname.endsWith("/register")
     ) {
       const formData = await request.clone().formData();
-      const email = formData.get("email");
-      if (!env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)) {
+      const email = formData.get("email")?.toString().trim();
+      if (
+        email &&
+        !env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)
+      ) {
         return new Response("Unauthorized", { status: 401 });
       }
     }
