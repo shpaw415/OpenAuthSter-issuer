@@ -1,5 +1,4 @@
-export const COOKIE_NAME = "oauth_client_id" as const;
-export const COOKIE_COPY_TEMPLATE_ID = "oauth_copy_template_id" as const;
+import { COOKIE_NAME } from "openauth-webui-shared-types";
 
 export function createClientIdCookieContent(clientId: string) {
   return createCookieContent(COOKIE_NAME, clientId, {

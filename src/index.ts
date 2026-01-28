@@ -1,13 +1,13 @@
 import { issuer } from "@openauthjs/openauth";
 import { D1Storage } from "./db/d1-adapter";
 
+import { createClientIdCookieContent, createCookieContent } from "./share";
 import {
+  parseDBProject,
+  Project,
   COOKIE_COPY_TEMPLATE_ID,
   COOKIE_NAME,
-  createClientIdCookieContent,
-  createCookieContent,
-} from "./share";
-import { parseDBProject, Project } from "openauth-webui-shared-types";
+} from "openauth-webui-shared-types";
 
 import DefaultTheme from "./defaults/theme";
 import {
@@ -30,15 +30,9 @@ export default {
     const url = new URL(request.url);
     const headers = new Headers();
 
-    // [0]: project_id, [1]: CopyId;
-    const queryData = url.searchParams.get("client_id")?.split("::") as
-      | [string, string | undefined]
-      | null;
-
     const cookies = getCookiesFromRequest(request);
-    const client_id = queryData?.[0] || getClientIdFromCookies(cookies);
-    const copyTemplateId =
-      queryData?.[1] || cookies[COOKIE_COPY_TEMPLATE_ID] || null;
+    const client_id = getClientIdFromCookies(cookies);
+    const copyTemplateId = getCopyIdFromCookies(cookies);
 
     if (!client_id) return new Response("Missing client_id", { status: 400 });
     else if (client_id || copyTemplateId)
@@ -122,6 +116,10 @@ function getClientIdFromCookies(
   cookies: Record<string, string>,
 ): string | null {
   return cookies[COOKIE_NAME] || null;
+}
+
+function getCopyIdFromCookies(cookies: Record<string, string>): string | null {
+  return cookies[COOKIE_COPY_TEMPLATE_ID] || null;
 }
 
 function getCookiesFromRequest(request: Request): Record<string, string> {
