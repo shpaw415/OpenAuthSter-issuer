@@ -32,6 +32,13 @@ export default {
       return utilityResponse;
     }
     const url = new URL(request.url);
+    const clientIDParamsForm =
+      (url.pathname == "/token" &&
+        ((await request.clone().formData())
+          .get("client_id")
+          ?.toString()
+          .split("::") as [string, string | null])) ||
+      null;
     const headers = new Headers();
     // [0]: client_id [1]: copyID
     const clientIDParams = url.searchParams.get("client_id")?.split("::") as
@@ -39,9 +46,14 @@ export default {
       | null;
 
     const cookies = getCookiesFromRequest(request);
-    const client_id = clientIDParams?.[0] || getClientIdFromCookies(cookies);
-    const copyTemplateId = clientIDParams?.[1] || getCopyIdFromCookies(cookies);
-
+    const client_id =
+      clientIDParams?.[0] ||
+      clientIDParamsForm?.[0] ||
+      getClientIdFromCookies(cookies);
+    const copyTemplateId =
+      clientIDParams?.[1] ||
+      clientIDParamsForm?.[1] ||
+      getCopyIdFromCookies(cookies);
     if (!client_id) return new Response("Missing client_id", { status: 400 });
     else if (client_id || copyTemplateId)
       headers.append("Set-Cookie", createClientIdCookieContent(client_id));
