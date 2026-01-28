@@ -1,5 +1,4 @@
 import {
-  CodeProviderConfig,
   CognitoProviderConfig,
   CopyDataSelection,
   EmailTemplateProps,
@@ -23,17 +22,14 @@ import {
   emailTemplatesTable,
   WebUiCopyTemplateTable,
 } from "openauth-webui-shared-types/database";
-import type { CodeUIOptions } from "@openauthjs/openauth/ui/code";
 import { SlackConfig } from "@openauthjs/openauth/provider/slack";
 
 export async function generateProvidersFromConfig({
   project,
   env,
-  copyTemplateId,
 }: {
   project: Project;
   env: Env;
-  copyTemplateId: string | null;
 }): Promise<Record<string, Provider<any>>> {
   let globalConfig: ExternalGlobalProjectConfig | undefined = undefined;
   const getSetGlobal = async () => {
@@ -44,93 +40,94 @@ export async function generateProvidersFromConfig({
   };
   const providers = (
     await Promise.all(
-      project.providers_data.map(async (providerConfig) => {
-        switch (providerConfig.type) {
-          case "code":
-            return {
-              code: await createCodeProvider({
-                providerConfig,
-                env,
-                globalConfig: await getSetGlobal(),
-                project,
-              }),
-            };
-          case "oidc":
-            return {
-              oidc: await createOIDCProvider(providerConfig),
-            };
-          case "apple":
-            return {
-              apple: await createAppleProvider(providerConfig),
-            };
-          case "x":
-            return {
-              x: await createXProvider(providerConfig),
-            };
-          case "slack":
-            return {
-              slack: await createSlackProvider(providerConfig),
-            };
-          case "yahoo":
-            return {
-              yahoo: await createYahooProvider(providerConfig),
-            };
-          case "google":
-            return {
-              google: await createGoogleProvider(providerConfig),
-            };
-          case "github":
-            return {
-              github: await createGitHubProvider(providerConfig),
-            };
-          case "twitch":
-            return {
-              twitch: await createTwitchProvider(providerConfig),
-            };
-          case "spotify":
-            return {
-              spotify: await createSpotifyProvider(providerConfig),
-            };
-          case "cognito":
-            return {
-              cognito: await createCognitoProvider(providerConfig),
-            };
-          case "discord":
-            return {
-              discord: await createDiscordProvider(providerConfig),
-            };
-          case "facebook":
-            return {
-              facebook: await createFacebookProvider(providerConfig),
-            };
-          case "keycloak":
-            return {
-              keycloak: await createKeycloakProvider(providerConfig),
-            };
-          case "password":
-            return {
-              password: await createPasswordProvider({
-                globalConfig: await getSetGlobal(),
-                providerConfig,
-                env,
-                project,
-              }),
-            };
-          case "microsoft":
-            return {
-              microsoft: await createMicrosoftProvider(providerConfig),
-            };
-          case "jumpcloud":
-            return {
-              jumpcloud: await createJumpCloudProvider(providerConfig),
-            };
+      project.providers_data
+        .filter((p) => p.enabled)
+        .map(async (providerConfig) => {
+          switch (providerConfig.type) {
+            case "code":
+              return {
+                code: await createCodeProvider({
+                  env,
+                  globalConfig: await getSetGlobal(),
+                  project,
+                }),
+              };
+            case "oidc":
+              return {
+                oidc: await createOIDCProvider(providerConfig),
+              };
+            case "apple":
+              return {
+                apple: await createAppleProvider(providerConfig),
+              };
+            case "x":
+              return {
+                x: await createXProvider(providerConfig),
+              };
+            case "slack":
+              return {
+                slack: await createSlackProvider(providerConfig),
+              };
+            case "yahoo":
+              return {
+                yahoo: await createYahooProvider(providerConfig),
+              };
+            case "google":
+              return {
+                google: await createGoogleProvider(providerConfig),
+              };
+            case "github":
+              return {
+                github: await createGitHubProvider(providerConfig),
+              };
+            case "twitch":
+              return {
+                twitch: await createTwitchProvider(providerConfig),
+              };
+            case "spotify":
+              return {
+                spotify: await createSpotifyProvider(providerConfig),
+              };
+            case "cognito":
+              return {
+                cognito: await createCognitoProvider(providerConfig),
+              };
+            case "discord":
+              return {
+                discord: await createDiscordProvider(providerConfig),
+              };
+            case "facebook":
+              return {
+                facebook: await createFacebookProvider(providerConfig),
+              };
+            case "keycloak":
+              return {
+                keycloak: await createKeycloakProvider(providerConfig),
+              };
+            case "password":
+              return {
+                password: await createPasswordProvider({
+                  globalConfig: await getSetGlobal(),
+                  providerConfig,
+                  env,
+                  project,
+                }),
+              };
+            case "microsoft":
+              return {
+                microsoft: await createMicrosoftProvider(providerConfig),
+              };
+            case "jumpcloud":
+              return {
+                jumpcloud: await createJumpCloudProvider(providerConfig),
+              };
 
-          default:
-            throw new Error(
-              `Unsupported provider type: ${providerConfig.type}`,
-            );
-        }
-      }),
+            default:
+              throw new Error(
+                `Unsupported provider type: ${providerConfig.type}`,
+              );
+          }
+        }),
     )
   ).reduce((acc, curr) => ({ ...acc, ...curr }), {});
   return providers;
@@ -378,12 +375,10 @@ async function createPasswordProvider({
 }
 
 async function createCodeProvider({
-  providerConfig,
   env,
   globalConfig,
   project,
 }: {
-  providerConfig: CodeProviderConfig;
   env: Env;
   globalConfig: ExternalGlobalProjectConfig;
   project: Project;

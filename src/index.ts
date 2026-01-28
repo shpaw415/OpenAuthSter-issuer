@@ -67,7 +67,6 @@ export default {
       providers: await generateProvidersFromConfig({
         project,
         env,
-        copyTemplateId,
       }),
       theme: await getThemeFromProject(project, env),
       success: async (ctx, value) => {
