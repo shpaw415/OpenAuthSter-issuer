@@ -31,29 +31,13 @@ export default {
     if (utilityResponse) {
       return utilityResponse;
     }
-    const url = new URL(request.url);
-    const clientIDParamsForm =
-      (url.pathname == "/token" &&
-        ((await request.clone().formData())
-          .get("client_id")
-          ?.toString()
-          .split("::") as [string, string | null])) ||
-      null;
-    const headers = new Headers();
-    // [0]: client_id [1]: copyID
-    const clientIDParams = url.searchParams.get("client_id")?.split("::") as
-      | [string, string | null]
-      | null;
 
-    const cookies = getCookiesFromRequest(request);
-    const client_id =
-      clientIDParams?.[0] ||
-      clientIDParamsForm?.[0] ||
-      getClientIdFromCookies(cookies);
-    const copyTemplateId =
-      clientIDParams?.[1] ||
-      clientIDParamsForm?.[1] ||
-      getCopyIdFromCookies(cookies);
+    const params = await requestToParams(request);
+    const client_id = params.clientID;
+    const copyTemplateId = params.copyID;
+
+    const headers = new Headers();
+
     if (!client_id) return new Response("Missing client_id", { status: 400 });
     else if (client_id || copyTemplateId)
       headers.append("Set-Cookie", createClientIdCookieContent(client_id));
@@ -73,7 +57,7 @@ export default {
     if (
       client_id === "openauth_webui" &&
       request.method === "POST" &&
-      url.pathname.endsWith("/register")
+      params.url.pathname.endsWith("/register")
     ) {
       const formData = await request.clone().formData();
       const email = formData.get("email")?.toString().trim();
@@ -244,4 +228,42 @@ function UtilityResponse(request: Request): Response | null {
       return new Response(packageJson.version);
   }
   return null;
+}
+
+type Params = {
+  clientID: string | null;
+  copyID: string | null;
+  url: URL;
+};
+
+async function requestToParams(request: Request): Promise<Params> {
+  const url = new URL(request.url);
+
+  const cookies = getCookiesFromRequest(request);
+
+  const clientIDParams = url.searchParams.get("client_id")?.split("::") as
+    | [string, string | null]
+    | null;
+
+  const clientIDParamsForm =
+    (url.pathname == "/token" &&
+      ((await request.clone().formData())
+        .get("client_id")
+        ?.toString()
+        .split("::") as [string, string | null])) ||
+    null;
+
+  return {
+    clientID:
+      cookies[COOKIE_NAME] ||
+      clientIDParams?.[0] ||
+      clientIDParamsForm?.[0] ||
+      null,
+    copyID:
+      cookies[COOKIE_COPY_TEMPLATE_ID] ||
+      clientIDParams?.[1] ||
+      clientIDParamsForm?.[1] ||
+      null,
+    url,
+  };
 }
