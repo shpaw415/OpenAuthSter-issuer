@@ -93,7 +93,7 @@ export default {
         ).register.onSuccessfulRegistration?.(ctx, value, request);
 
         return ctx.subject("user", {
-          id: await getOrCreateUser(env, value.email, client_id),
+          id: await getOrCreateUser(env, value, client_id),
           data: value,
         });
       },
