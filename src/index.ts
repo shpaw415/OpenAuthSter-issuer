@@ -92,6 +92,7 @@ export default {
         ).register.onSuccessfulRegistration?.(ctx, value, request);
         return ctx.subject("user", {
           id: await getOrCreateUser(env, value.email, client_id),
+          data: value,
         });
       },
       async error(error, req) {
@@ -150,7 +151,7 @@ async function getOrCreateUser(
         data: JSON.stringify(value),
         created_at: new Date().toISOString(),
       })
-      .returning({ id: usersTable.id, data: usersTable.data })
+      .returning({ id: usersTable.id })
   ).at(0);
 
   if (!result) {

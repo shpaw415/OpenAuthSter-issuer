@@ -1,5 +1,5 @@
 import { createSubjects } from "@openauthjs/openauth/subject";
-import { object, string } from "valibot";
+import { object, string, any } from "valibot";
 import { createExternalGlobalProjectConfig } from "openauth-webui-shared-types";
 
 export default async (env: Env) =>
@@ -23,5 +23,6 @@ export default async (env: Env) =>
 export const subjects = createSubjects({
   user: object({
     id: string(),
+    data: any(),
   }),
 });
