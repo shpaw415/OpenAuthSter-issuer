@@ -252,14 +252,14 @@ async function requestToParams(request: Request): Promise<Params> {
 
   return {
     clientID:
-      cookies[COOKIE_NAME] ||
       clientIDParams?.[0] ||
       clientIDParamsForm?.[0] ||
+      cookies[COOKIE_NAME] ||
       null,
     copyID:
-      cookies[COOKIE_COPY_TEMPLATE_ID] ||
       clientIDParams?.[1] ||
       clientIDParamsForm?.[1] ||
+      cookies[COOKIE_COPY_TEMPLATE_ID] ||
       null,
     url,
   };
