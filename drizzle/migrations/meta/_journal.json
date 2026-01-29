@@ -22,6 +22,13 @@
       "when": 1769633733901,
       "tag": "0002_naive_umar",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1769702731944,
+      "tag": "0003_brainy_quicksilver",
+      "breakpoints": true
     }
   ]
 }
