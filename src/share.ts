@@ -6,7 +6,7 @@ import {
 export function createClientIdCookieContent(clientId: string) {
   return createCookieContent(COOKIE_NAME, clientId, {
     httpOnly: true,
-    secure: false,
+    secure: true,
     sameSite: "None",
     maxAge: 60 * 60 * 24 * 30, // 30 days
   });
@@ -15,7 +15,7 @@ export function createClientIdCookieContent(clientId: string) {
 export function createCopyIdCookieContent(copyId: string) {
   return createCookieContent(COOKIE_COPY_TEMPLATE_ID, copyId, {
     httpOnly: true,
-    secure: false,
+    secure: true,
     sameSite: "None",
     maxAge: 60 * 60 * 24 * 30, // 30 days
   });
