@@ -125,7 +125,6 @@ export async function generateProvidersFromConfig({
               return {
                 jumpcloud: await createJumpCloudProvider(providerConfig),
               };
-
             default:
               throw new Error(
                 `Unsupported provider type: ${providerConfig.type}`,

@@ -21,9 +21,23 @@ function code(data: CodeData): string {
   return data.claims.email || data.claims.phone;
 }
 
+export type GoogleData = {
+  provider: "google";
+  claims: {
+    email: string;
+    email_verified: boolean;
+    sub: string;
+  };
+};
+
+function google(data: GoogleData): string {
+  return data.claims.email;
+}
+
 export default {
   extractIdentifierFor: {
     password,
     code,
+    google,
   },
 };
