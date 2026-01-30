@@ -54,3 +54,10 @@ export function createCookieContent(
 
   return cookieString;
 }
+const islog = true;
+
+export function log(...args: any[]) {
+  if (islog) {
+    console.log(...args);
+  }
+}

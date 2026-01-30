@@ -7,8 +7,8 @@
   "d1_databases": [
     {
       "binding": "AUTH_DB",
-      "database_name": "<YOUR_D1_DATABASE_NAME>",
-      "database_id": "<YOUR_D1_DATABASE_ID>",
+      "database_name": "openauthster-db",
+      "database_id": "e9452fa0-a2eb-40e0-a7bb-5f24d03850de",
       "migrations_dir": "drizzle/migrations",
       "remote": true
     }
@@ -16,8 +16,5 @@
   "observability": {
     "enabled": true
   },
-  "compatibility_flags": ["nodejs_compat"],
-  "vars": {
-    "WEBUI_ADMIN_EMAILS": "admin1@email.com,admin2@email.com"
-  }
+  "compatibility_flags": ["nodejs_compat"]
 }

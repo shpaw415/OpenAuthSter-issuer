@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "72db5a47-3346-469c-a476-51c4eec6289d",
+  "id": "43792df4-c167-4309-bbef-bec2448a0d68",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "openauth_webui_copy_templates": {
@@ -59,8 +59,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "email": {
-          "name": "email",
+        "identifier": {
+          "name": "identifier",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -82,10 +82,10 @@
         }
       },
       "indexes": {
-        "openauth_webui_users_email_unique": {
-          "name": "openauth_webui_users_email_unique",
+        "openauth_webui_users_identifier_unique": {
+          "name": "openauth_webui_users_identifier_unique",
           "columns": [
-            "email"
+            "identifier"
           ],
           "isUnique": true
         }
@@ -201,6 +201,27 @@
           "notNull": false,
           "autoincrement": false,
           "default": "'{}'"
+        },
+        "originURL": {
+          "name": "originURL",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "authEndpointURL": {
+          "name": "authEndpointURL",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cloudflareDomaineID": {
+          "name": "cloudflareDomaineID",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {},

@@ -1,0 +1,1 @@
+ALTER TABLE `openauth_webui_projects` ADD `secret` text NOT NULL;

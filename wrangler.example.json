@@ -3,13 +3,6 @@
   "compatibility_date": "2025-10-08",
   "main": "src/index.ts",
   "name": "openauthster-issuer",
-  "routes": [
-    {
-      "pattern": "*-auth.<YOUR_DOMAIN>/*",
-      "zone_name": "<YOUR_ZONE_NAME>",
-      "custom_domain": false
-    }
-  ],
   "upload_source_maps": true,
   "d1_databases": [
     {
@@ -26,6 +19,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "WEBUI_ADMIN_EMAILS": "email1@example.com,email2@example.com",
-    "WEBUI_ORIGIN_URL": "https://your-webui-domain.com"
+    "WEBUI_ORIGIN_URL": "https://your-webui-domain.com",
+    "ISSUER_URL": "https://your-issuer-domain.com"
   }
 }

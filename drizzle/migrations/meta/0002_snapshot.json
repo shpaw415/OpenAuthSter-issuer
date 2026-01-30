@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "52bb4f21-df3f-48dc-b262-323e429f834a",
-  "prevId": "3eefd27f-b2e9-42ca-95d4-8661df1baa15",
+  "id": "5e40f850-fe44-46c1-b156-8f6dd5234921",
+  "prevId": "a3d99bf8-eccf-4a79-b3f8-645b32a0e5d5",
   "tables": {
     "openauth_webui_copy_templates": {
       "name": "openauth_webui_copy_templates",
@@ -71,6 +71,20 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "session_private": {
+          "name": "session_private",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "session_public": {
+          "name": "session_public",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {
@@ -207,6 +221,27 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
+          "autoincrement": false
+        },
+        "secret": {
+          "name": "secret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "authEndpointURL": {
+          "name": "authEndpointURL",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cloudflareDomaineID": {
+          "name": "cloudflareDomaineID",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false
         }
       },

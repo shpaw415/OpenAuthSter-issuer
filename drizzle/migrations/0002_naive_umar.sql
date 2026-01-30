@@ -1,1 +1,0 @@
-ALTER TABLE `openauth_webui_projects` ADD `originURL` text;

@@ -1,9 +1,11 @@
 import { issuer } from "@openauthjs/openauth";
+import { createClient } from "@openauthjs/openauth/client";
 import { D1Storage } from "./db/d1-adapter";
 
 import {
   createClientIdCookieContent,
   createCopyIdCookieContent,
+  log,
 } from "./share";
 import {
   parseDBProject,
@@ -18,104 +20,119 @@ import {
   projectTable,
   uiStyleTable,
 } from "openauth-webui-shared-types/database";
-import { drizzle, eq } from "openauth-webui-shared-types/drizzle";
+import { drizzle, eq, and } from "openauth-webui-shared-types/drizzle";
 import { Theme } from "@openauthjs/openauth/ui/theme";
 import globalOpenAutsterConfig, { subjects } from "../openauth.config";
 import packageJson from "../package.json" assert { type: "json" };
 import { generateProvidersFromConfig } from "./providers-setup";
 import UserSetup from "./user-setup";
+import UserEndpoints from "./user-endpoints";
+
+async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  const utilityResponse = UtilityResponse(request);
+  if (utilityResponse) {
+    return utilityResponse;
+  }
+
+  const params = await requestToParams(request);
+  const client_id = params.clientID;
+  const copyTemplateId = params.copyID;
+
+  log(
+    `Incoming request for client_id: ${client_id}, copyTemplateId: ${copyTemplateId}, url: ${params.url.href}, method: ${request.method}`,
+  );
+
+  const headers = new Headers();
+
+  headers.set("Access-Control-Allow-Credentials", "true");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  headers.set("Vary", "Origin, Cookie");
+  headers.set("Access-Control-Allow-Origin", "*");
+
+  if (!client_id) return new Response("Missing client_id", { status: 400 });
+  else if (client_id || copyTemplateId)
+    headers.append("Set-Cookie", createClientIdCookieContent(client_id));
+  if (copyTemplateId)
+    headers.append("Set-Cookie", createCopyIdCookieContent(copyTemplateId));
+
+  const project = await getProjectById(client_id, env);
+  if (!project) {
+    log(`Project not found for client_id: ${client_id}`);
+    return Response.json(
+      {
+        error: `Invalid client_id or project not found, (client_id: ${client_id})`,
+      },
+      {
+        status: 400,
+        headers,
+      },
+    );
+  }
+
+  if (
+    client_id === "openauth_webui" &&
+    request.method === "POST" &&
+    params.url.pathname.endsWith("/register")
+  ) {
+    const formData = await request.clone().formData();
+    const email = formData.get("email")?.toString().trim();
+    if (
+      email &&
+      !env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)
+    ) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
+  let res: Response;
+  if (params.url.pathname.startsWith("/user-endpoint")) {
+    res = await UserEndpoints({ request, env, ctx, project });
+  }
+
+  res ??= await issuer({
+    storage: D1Storage({
+      database: env.AUTH_DB,
+      table: client_id,
+    }),
+    subjects,
+    providers: await generateProvidersFromConfig({
+      project,
+      env,
+      copyTemplateId,
+    }),
+    theme: await getThemeFromProject(project, env),
+    success: async (ctx, value, request) => {
+      console.log(`Successful authentication with value: `, value);
+
+      await (
+        await globalOpenAutsterConfig(env)
+      ).register.onSuccessfulRegistration?.(ctx, value, request);
+
+      return ctx.subject("user", {
+        id: await getOrCreateUser(env, value, client_id),
+        data: value,
+      });
+    },
+    async error(error, req) {
+      console.error(`Error during authentication for ${req.url}:`, error);
+      console.log(req);
+      return Response.json({ error: "Authentication error" }, { status: 500 });
+    },
+  }).fetch(request, env, ctx);
+
+  headers.forEach((value, key) => {
+    res.headers.append(key, value);
+  });
+  res.headers.set(
+    "Access-Control-Allow-Origin",
+    project.originURL || env.WEBUI_ORIGIN_URL,
+  );
+
+  return res;
+}
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    const utilityResponse = UtilityResponse(request);
-    if (utilityResponse) {
-      return utilityResponse;
-    }
-
-    const params = await requestToParams(request);
-    const client_id = params.clientID;
-    const copyTemplateId = params.copyID;
-
-    const headers = new Headers();
-
-    headers.set("Access-Control-Allow-Credentials", "true");
-    headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-
-    if (!client_id) return new Response("Missing client_id", { status: 400 });
-    else if (client_id || copyTemplateId)
-      headers.append("Set-Cookie", createClientIdCookieContent(client_id));
-    if (copyTemplateId)
-      headers.append("Set-Cookie", createCopyIdCookieContent(copyTemplateId));
-
-    const project = await getProjectById(client_id, env);
-    if (!project) {
-      return Response.json(
-        {
-          error: `Invalid client_id or project not found, (clientID: ${client_id})`,
-        },
-        { status: 400 },
-      );
-    }
-
-    if (
-      client_id === "openauth_webui" &&
-      request.method === "POST" &&
-      params.url.pathname.endsWith("/register")
-    ) {
-      const formData = await request.clone().formData();
-      const email = formData.get("email")?.toString().trim();
-      if (
-        email &&
-        !env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)
-      ) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-    }
-
-    const res = await issuer({
-      storage: D1Storage({
-        database: env.AUTH_DB,
-        table: client_id,
-      }),
-      subjects,
-      providers: await generateProvidersFromConfig({
-        project,
-        env,
-        copyTemplateId,
-      }),
-      theme: await getThemeFromProject(project, env),
-      success: async (ctx, value, request) => {
-        console.log(`Successful authentication with value: `, value);
-
-        await (
-          await globalOpenAutsterConfig(env)
-        ).register.onSuccessfulRegistration?.(ctx, value, request);
-
-        return ctx.subject("user", {
-          id: await getOrCreateUser(env, value, client_id),
-          data: value,
-        });
-      },
-      async error(error, req) {
-        console.error(`Error during authentication for ${req.url}:`, error);
-        console.log(req);
-        return Response.json(
-          { error: "Authentication error" },
-          { status: 500 },
-        );
-      },
-    }).fetch(request, env, ctx);
-
-    headers.forEach((value, key) => {
-      res.headers.append(key, value);
-    });
-    res.headers.set(
-      "Access-Control-Allow-Origin",
-      project.originURL || env.WEBUI_ORIGIN_URL,
-    );
-
-    return res;
-  },
+  fetch: _fetch,
 } satisfies ExportedHandler<Env>;
 
 function getCookiesFromRequest(request: Request): Record<string, string> {
@@ -199,6 +216,9 @@ async function getProjectById(
       clientID: "openauth_webui",
       created_at: new Date().toISOString(),
       codeMode: "email",
+      secret: "",
+      authEndpointURL: "",
+      cloudflareDomaineID: "",
       providers_data: [
         {
           type: "password",
@@ -216,17 +236,6 @@ async function getProjectById(
   return parseDBProject(projectData);
 }
 
-function UtilityResponse(request: Request): Response | null {
-  const url = new URL(request.url);
-  switch (url.pathname) {
-    case "/health":
-      return new Response("OK");
-    case "/version":
-      return new Response(packageJson.version);
-  }
-  return null;
-}
-
 type Params = {
   clientID: string | null;
   copyID: string | null;
@@ -241,14 +250,19 @@ async function requestToParams(request: Request): Promise<Params> {
   const clientIDParams = url.searchParams.get("client_id")?.split("::") as
     | [string, string | null]
     | null;
+  const formData =
+    request.method === "POST" ? await request.clone().formData() : null;
+  const clientIDParamsForm = formData
+    ?.get("client_id")
+    ?.toString()
+    .split("::") as [string, string | null] | null;
 
-  const clientIDParamsForm =
-    (url.pathname == "/token" &&
-      ((await request.clone().formData())
-        .get("client_id")
-        ?.toString()
-        .split("::") as [string, string | null])) ||
-    null;
+  log(
+    `Parsed params - clientIDParams: ${clientIDParams}, clientIDParamsForm: ${clientIDParamsForm}, cookies: ${JSON.stringify(
+      cookies,
+    )}`,
+    formData,
+  );
 
   return {
     clientID:
@@ -264,3 +278,28 @@ async function requestToParams(request: Request): Promise<Params> {
     url,
   };
 }
+
+// Endpoint Section ////////////////////////////////////////////////
+
+function UtilityResponse(request: Request): Response | null {
+  const url = new URL(request.url);
+  switch (url.pathname) {
+    case "/health":
+      return new Response("OK");
+    case "/version":
+      return new Response(packageJson.version);
+    case "/user-endpoint":
+      if (request.method !== "OPTIONS") break;
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+      });
+  }
+  return null;
+}
+
+// End Endpoint Section ////////////////////////////////////////////
