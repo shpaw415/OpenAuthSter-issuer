@@ -1,5 +1,4 @@
 import { issuer } from "@openauthjs/openauth";
-import { createClient } from "@openauthjs/openauth/client";
 import { D1Storage } from "./db/d1-adapter";
 
 import {
@@ -12,6 +11,7 @@ import {
   Project,
   COOKIE_COPY_TEMPLATE_ID,
   COOKIE_NAME,
+  ProviderConfig,
 } from "openauth-webui-shared-types";
 
 import DefaultTheme from "./defaults/theme";
@@ -24,8 +24,11 @@ import { drizzle, eq, and } from "openauth-webui-shared-types/drizzle";
 import { Theme } from "@openauthjs/openauth/ui/theme";
 import globalOpenAutsterConfig, { subjects } from "../openauth.config";
 import packageJson from "../package.json" assert { type: "json" };
-import { generateProvidersFromConfig } from "./providers-setup";
-import UserSetup from "./user-setup";
+import {
+  generateProvidersFromConfig,
+  providerConfigMap,
+  userExtractResult,
+} from "./providers-setup";
 import UserEndpoints from "./user-endpoints";
 
 async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
@@ -108,9 +111,18 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
         await globalOpenAutsterConfig(env)
       ).register.onSuccessfulRegistration?.(ctx, value, request);
 
+      const userData = await getOrCreateUser(
+        env,
+        value,
+        client_id,
+        project.providers_data.find(
+          (p) => p.type === value.provider,
+        ) as ProviderConfig,
+      );
+
       return ctx.subject("user", {
-        id: await getOrCreateUser(env, value, client_id),
-        data: value,
+        id: userData.id,
+        data: userData.data,
       });
     },
     async error(error, req) {
@@ -152,36 +164,38 @@ async function getOrCreateUser(
   env: Env,
   value: Record<string, any>,
   clientId: string,
-): Promise<string> {
+  providerConfig: ProviderConfig,
+): Promise<userExtractResult<{}> & { id: string }> {
   const usersTable = OTFusersTable(clientId);
-  const identifier = UserSetup.extractIdentifierFor[
-    value.provider as keyof typeof UserSetup.extractIdentifierFor
-  ](value as any);
+  const userData = await providerConfigMap[
+    value.provider as keyof typeof providerConfigMap
+  ].parser(value, providerConfig);
+
   const result = (
     await drizzle(env.AUTH_DB)
       .insert(usersTable)
       .values({
         id: crypto.randomUUID() + crypto.randomUUID(),
-        identifier,
-        data: JSON.stringify(value),
+        identifier: userData.identifier,
+        data: JSON.stringify(userData.data),
         created_at: new Date().toISOString(),
       })
       .onConflictDoUpdate({
         target: usersTable.identifier,
         set: {
-          data: JSON.stringify(value),
+          data: JSON.stringify(userData.data),
         },
       })
       .returning({ id: usersTable.id })
   ).at(0);
 
   if (!result) {
-    throw new Error(`Unable to process user: ${JSON.stringify(value)}`);
+    throw new Error(`Unable to process user: ${JSON.stringify(userData)}`);
   }
-  console.log(
-    `Found or created user ${result.id} with data ${JSON.stringify(value)}`,
+  log(
+    `Found or created user ${result.id} with data ${JSON.stringify(userData.data)}`,
   );
-  return result.id;
+  return { ...userData, id: result.id };
 }
 
 async function getThemeFromProject(project: Project, env: Env): Promise<Theme> {

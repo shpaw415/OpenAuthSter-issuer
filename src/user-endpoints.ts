@@ -40,7 +40,10 @@ export default async function userEndPoint({
 
   const verified = await client.verify(subjects, accessToken);
   if (verified.err) {
-    return new Response("Unauthorized: Invalid Token", { status: 401 });
+    return new Response(
+      `Unauthorized: Invalid Token: ${verified.err.message} => ${verified.err.stack}`,
+      { status: 401 },
+    );
   }
 
   if (data.action === "get") {
@@ -93,6 +96,34 @@ export default async function userEndPoint({
       });
       return Response.json(updatedData);
     }
+  } else if (data.action === "delete") {
+    if (data.type === "public") {
+      const updatedData = await updateUserPublicData({
+        userID: verified.subject.properties.id,
+        clientID: data.client_id,
+        env,
+        newData: {},
+        skipMerge: true,
+      });
+      return Response.json(updatedData);
+    } else if (data.type === "private") {
+      const secret = getSecretFromRequest(request);
+      if (!secret) {
+        return new Response("Unauthorized: Missing Client Secret", {
+          status: 401,
+        });
+      }
+      const updatedData = await updateUserPrivateData({
+        userID: verified.subject.properties.id,
+        clientID: data.client_id,
+        env,
+        newData: {},
+        secret,
+        projectSecret: project.secret,
+        skipMerge: true,
+      });
+      return Response.json(updatedData);
+    }
   }
 
   return new Response("Bad Request", { status: 400 });
@@ -105,6 +136,7 @@ async function updateUserPrivateData({
   newData,
   secret,
   projectSecret,
+  skipMerge = false,
 }: {
   userID: string;
   clientID: string;
@@ -112,6 +144,7 @@ async function updateUserPrivateData({
   newData: any;
   secret: string;
   projectSecret: string;
+  skipMerge?: boolean;
 }): Promise<ResponseData> {
   const usersTable = OTFusersTable(clientID);
   const currentData = await getUserPrivateData({
@@ -124,10 +157,12 @@ async function updateUserPrivateData({
   if (!currentData.success) {
     return currentData;
   }
-  const mergedData = {
-    ...currentData.data?.private,
-    ...newData,
-  };
+  const mergedData = skipMerge
+    ? newData
+    : {
+        ...currentData.data?.private,
+        ...newData,
+      };
   return drizzle(env.AUTH_DB)
     .update(usersTable)
     .set({
@@ -165,11 +200,13 @@ async function updateUserPublicData({
   clientID,
   env,
   newData,
+  skipMerge = false,
 }: {
   userID: string;
   clientID: string;
   env: Env;
   newData: any;
+  skipMerge?: boolean;
 }): Promise<ResponseData> {
   const usersTable = OTFusersTable(clientID);
   const currentData = await getUserPublicData(userID, clientID, env);
@@ -179,10 +216,12 @@ async function updateUserPublicData({
       error: "User not found",
     };
   }
-  const mergedData: Record<string, any> = {
-    ...(currentData.data?.public || {}),
-    ...newData,
-  };
+  const mergedData: Record<string, any> = skipMerge
+    ? newData
+    : {
+        ...(currentData.data?.public || {}),
+        ...newData,
+      };
   return drizzle(env.AUTH_DB)
     .update(usersTable)
     .set({

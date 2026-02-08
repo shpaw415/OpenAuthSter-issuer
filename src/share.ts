@@ -54,7 +54,7 @@ export function createCookieContent(
 
   return cookieString;
 }
-const islog = true;
+const islog = false;
 
 export function log(...args: any[]) {
   if (islog) {
