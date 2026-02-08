@@ -5,7 +5,7 @@ import {
   type VerifyResult,
 } from "@openauthjs/openauth/client";
 import type { createSubjects } from "@openauthjs/openauth/subject";
-import { COOKIE_NAME } from "../share";
+import { COOKIE_NAME } from "openauth-webui-shared-types";
 
 export type AuthManagerProps<Schema extends ReturnType<typeof createSubjects>> =
   {
