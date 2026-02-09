@@ -31,10 +31,14 @@ npm install -g wrangler
 
 ### 1. Clone the Repository
 
+Clone as a **private repository** (recommended for production):
+
 ```bash
-git clone https://github.com/shpaw415/OpenAuthSter-issuer.git
-cd OpenAuthSter-issuer
+git clone https://github.com/shpaw415/OpenAuthSter-issuer.git openauth-issuer
+cd openauth-issuer
 ```
+
+> ⚠️ **Security Note:** Keep your issuer repository private as it contains sensitive authentication configuration and secrets.
 
 ### 2. Install Dependencies
 
@@ -42,10 +46,21 @@ cd OpenAuthSter-issuer
 bun install
 ```
 
-### 3. Rename wrangler.example.json and run the types
+### 3. Configure Wrangler
 
-Rename or create `wrangler.example.json` > `wrangler.json`.
-Run `wrangler types`
+Rename `wrangler.example.json` to `wrangler.json`:
+
+```bash
+mv wrangler.example.json wrangler.json
+```
+
+Then run the types generation:
+
+```bash
+wrangler types
+```
+
+Update `wrangler.json` with the database credentials from step 4.
 
 ### 4. Create D1 Database
 
@@ -57,7 +72,7 @@ wrangler d1 create openauth-db
 
 ### 5. Configure Wrangler
 
-Update your `wrangler.json` with the database credentials:
+Update your `wrangler.json` with the database credentials and environment variables:
 
 ```json
 {
@@ -65,11 +80,28 @@ Update your `wrangler.json` with the database credentials:
     {
       "binding": "AUTH_DB",
       "database_name": "<your-database-name>",
-      "database_id": "<your-database-id>"
+      "database_id": "<your-database-id>",
+      "migrations_dir": "drizzle/migrations",
+      "remote": true
     }
-  ]
+  ],
+  "vars": {
+    "WEBUI_ADMIN_EMAILS": "admin@example.com,owner@example.com",
+    "WEBUI_ORIGIN_URL": "https://admin.yourdomain.com",
+    "ISSUER_URL": "https://auth.yourdomain.com"
+  }
 }
 ```
+
+**Configuration Details:**
+
+| Variable             | Description                                                   | Example                                |
+| -------------------- | ------------------------------------------------------------- | -------------------------------------- |
+| `database_name`      | D1 database name from step 4                                  | `openauth-db`                          |
+| `database_id`        | D1 database ID from step 4                                    | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
+| `WEBUI_ADMIN_EMAILS` | Comma-separated list of admin emails who can access the WebUI | `admin@example.com,owner@example.com`  |
+| `WEBUI_ORIGIN_URL`   | Your WebUI domain (deployed in next steps)                    | `https://admin.yourdomain.com`         |
+| `ISSUER_URL`         | Your issuer domain (this deployment)                          | `https://auth.yourdomain.com`          |
 
 > 💡 Copy the `database_name` and `database_id` from the output of the `wrangler d1 create` command
 
@@ -110,23 +142,35 @@ export default async (env: Env) =>
 export const subjects = createSubjects({
   user: object({
     id: string(),
+    data: any(),
   }),
 });
 ```
 
 ### 8. Deploy
 
-create a new private repo on your github dashboard.
-this way you can manage versioning direclty from git.
+Deploy to Cloudflare Workers:
 
-```bash
-git remote add cloudflare https://github.com/my-username/my-private-auth-issuer.git
-git add .
-git commit -m "setup"
-git push --set-upstream cloudflare
-```
+1. **Create a private GitHub repository** and push your code:
 
-go to your Cloudflare dashboard and create a new worker and link it with your newly created Repo.
+   ```bash
+   # Create a new private repository on GitHub
+   # Then set it as your remote:
+   git remote set-url origin https://github.com/YOUR_USERNAME/YOUR_PRIVATE_REPO.git
+   git add .
+   git commit -m "Initial setup"
+   git push -u origin main
+   ```
+
+2. **Create a Cloudflare Worker:**
+   - Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) → Workers & Pages
+   - Click "Create application" → "Create Worker"
+   - Connect to your private GitHub repository
+   - Cloudflare will automatically detect the `wrangler.json` configuration
+
+3. **Configure environment variables** (if needed) in the Cloudflare dashboard
+
+4. **Deploy!**
 
 ## Development
 
@@ -141,18 +185,18 @@ The server will be available at `http://localhost:8788`
 ## Project Structure
 
 ```
-openauth-multitenant-server/
+openauth-multitenant-server/  # (GitHub: OpenAuthSter-issuer)
 ├── src/
-│   ├── index.ts           # Worker entry point
-│   ├── providers-setup.ts # OAuth provider configuration
-│   ├── share.ts           # Shared utilities
-│   ├── client/            # Client-side utilities
-│   ├── db/                # Database schema and adapters
-│   ├── defaults/          # Default themes and email templates
-│   └── endpoints/         # API endpoints
-├── drizzle/               # Database migrations
-├── openauth.config.ts     # OpenAuth configuration
-└── wrangler.json          # Cloudflare Worker configuration
+│   ├── index.ts              # Worker entry point
+│   ├── providers-setup.ts    # OAuth provider configuration
+│   ├── share.ts              # Shared utilities
+│   ├── client/               # Client-side utilities
+│   ├── db/                   # Database schema and adapters
+│   ├── defaults/             # Default themes and email templates
+│   └── endpoints/            # API endpoints
+├── drizzle/                  # Database migrations
+├── openauth.config.ts        # OpenAuth configuration
+└── wrangler.json             # Cloudflare Worker configuration
 ```
 
 ## Next Steps
@@ -163,10 +207,11 @@ After deploying the issuer, set up the WebUI to manage your projects:
 
 ## Related Repositories
 
-- [OpenAuthster](https://github.com/shpaw415/openauthster) - Main project documentation
-- [OpenAuthster WebUI](https://github.com/shpaw415/OpenAuthSter-webUI) - Management dashboard
-- [Shared Types](https://github.com/shpaw415/OpenAuthSter-shared) - TypeScript types and client SDK
-- [React SDK](https://github.com/shpaw415/openauth-react) - React integration (WIP)
+- [OpenAuthster](https://github.com/shpaw415/openauthster) – Main project documentation
+- [OpenAuthster WebUI](https://github.com/shpaw415/OpenAuthSter-webUI) – Management dashboard
+- [Shared Types](https://github.com/shpaw415/OpenAuthSter-shared) – TypeScript types and client SDK
+- [React SDK](https://github.com/shpaw415/openauth-react) – React integration (WIP)
+- [Testing Environment](https://github.com/shpaw415/openauthster-tester) – Pre-configured testing setup
 
 ## License
 
