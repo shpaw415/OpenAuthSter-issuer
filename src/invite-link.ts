@@ -56,9 +56,8 @@ export async function createResponseFromInviteId({
 
   const url = new URL(redirectURI);
   url.searchParams.set("invite_flow", "true");
+  url.searchParams.set("invite_id", id);
   copyID && url.searchParams.set("copyID", copyID);
-  const inviteId = url.searchParams.get("invite_id");
-  inviteId && url.searchParams.set("invite_id", inviteId);
 
   const response = new Response(null, {
     status: 302,
