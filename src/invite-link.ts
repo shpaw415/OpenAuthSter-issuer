@@ -58,6 +58,8 @@ export async function createResponseFromInviteId({
   const url = new URL(redirectURI);
   url.searchParams.set("invite_flow", "true");
   copyID && url.searchParams.set("copyID", copyID);
+  const inviteId = url.searchParams.get("invite_id");
+  inviteId && url.searchParams.set("invite_id", inviteId);
 
   const response = new Response(null, {
     status: 302,
@@ -65,8 +67,6 @@ export async function createResponseFromInviteId({
       Location: url.toString(),
     },
   });
-
-  response.headers.append("Set-Cookie", createInviteIdCookieContent(id));
 
   return response;
 }
