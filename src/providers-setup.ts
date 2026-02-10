@@ -28,7 +28,6 @@ import {
   emailTemplatesTable,
   WebUiCopyTemplateTable,
 } from "openauth-webui-shared-types/database";
-import { json } from "drizzle-orm/singlestore-core/columns/json";
 import { JWTPayload } from "jose";
 
 export type userExtractResult<T extends Record<string, any>> = {

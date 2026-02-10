@@ -50,7 +50,7 @@ export default async function userEndPoint({
     if (data.type === "public") {
       const publicData = await getUserPublicData(
         verified.subject.properties.id,
-        data.client_id,
+        verified.subject.properties.clientID,
         env,
       );
       return Response.json(parse(UserEndpointResponseValidation, publicData));
@@ -63,7 +63,7 @@ export default async function userEndPoint({
       }
       const privateData = await getUserPrivateData({
         userID: verified.subject.properties.id,
-        clientID: data.client_id,
+        clientID: verified.subject.properties.clientID,
         env,
         secret,
         projectSecret: project.secret,
@@ -88,7 +88,7 @@ export default async function userEndPoint({
       }
       const updatedData = await updateUserPrivateData({
         userID: verified.subject.properties.id,
-        clientID: data.client_id,
+        clientID: verified.subject.properties.clientID,
         env,
         newData: data.data,
         secret,
@@ -100,7 +100,7 @@ export default async function userEndPoint({
     if (data.type === "public") {
       const updatedData = await updateUserPublicData({
         userID: verified.subject.properties.id,
-        clientID: data.client_id,
+        clientID: verified.subject.properties.clientID,
         env,
         newData: {},
         skipMerge: true,
@@ -115,7 +115,7 @@ export default async function userEndPoint({
       }
       const updatedData = await updateUserPrivateData({
         userID: verified.subject.properties.id,
-        clientID: data.client_id,
+        clientID: verified.subject.properties.clientID,
         env,
         newData: {},
         secret,
@@ -175,6 +175,7 @@ async function updateUserPrivateData({
       session_public: usersTable.session_public,
       id: usersTable.id,
       identifier: usersTable.identifier,
+      data: usersTable.data,
     })
     .then((el) => {
       if (el.length === 0) {
@@ -190,6 +191,9 @@ async function updateUserPrivateData({
           public: JSON.parse(el.at(0)?.session_public!),
           user_id: userID,
           user_identifier: el.at(0)?.identifier!,
+          userInfo: el.at(0)?.data
+            ? JSON.parse(el.at(0)?.data as string)
+            : null,
         },
       };
     });
@@ -231,6 +235,7 @@ async function updateUserPublicData({
     .limit(1)
     .returning({
       session_public: usersTable.session_public,
+      data: usersTable.data,
     })
     .then((el) => {
       if (el.length === 0) {
@@ -246,6 +251,7 @@ async function updateUserPublicData({
           private: null,
           user_id: userID,
           user_identifier: currentData.data?.user_identifier || "",
+          userInfo: el[0].data ? JSON.parse(el[0].data as string) : null,
         },
       };
     });
@@ -262,6 +268,7 @@ function getUserPublicData(
       public: usersTable.session_public,
       id: usersTable.id,
       identifier: usersTable.identifier,
+      data: usersTable.data,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userID))
@@ -281,6 +288,7 @@ function getUserPublicData(
           private: null,
           user_id: el.id,
           user_identifier: el.identifier,
+          userInfo: el.data ? JSON.parse(el.data as string) : null,
         },
       };
     })
@@ -321,6 +329,7 @@ async function getUserPrivateData({
       public: usersTable.session_public,
       id: usersTable.id,
       identifier: usersTable.identifier,
+      data: usersTable.data,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userID))
@@ -339,6 +348,7 @@ async function getUserPrivateData({
           public: el.public ? JSON.parse(el.public) : null,
           user_id: el.id,
           user_identifier: el.identifier,
+          userInfo: el.data ? JSON.parse(el.data as string) : null,
         },
         success: true,
       };

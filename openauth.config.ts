@@ -27,5 +27,7 @@ export const subjects = createSubjects({
   user: object({
     id: string(),
     data: any(),
+    clientID: string(),
+    provider: string(),
   }),
 });

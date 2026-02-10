@@ -123,6 +123,8 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
       return ctx.subject("user", {
         id: userData.id,
         data: userData.data,
+        clientID: client_id,
+        provider: value.provider,
       });
     },
     async error(error, req) {
@@ -170,20 +172,20 @@ async function getOrCreateUser(
   const userData = await providerConfigMap[
     value.provider as keyof typeof providerConfigMap
   ].parser(value, providerConfig);
-
+  const dataToStore = { ...userData.data, provider: value.provider };
   const result = (
     await drizzle(env.AUTH_DB)
       .insert(usersTable)
       .values({
         id: crypto.randomUUID() + crypto.randomUUID(),
         identifier: userData.identifier,
-        data: JSON.stringify(userData.data),
+        data: JSON.stringify(dataToStore),
         created_at: new Date().toISOString(),
       })
       .onConflictDoUpdate({
         target: usersTable.identifier,
         set: {
-          data: JSON.stringify(userData.data),
+          data: JSON.stringify(dataToStore),
         },
       })
       .returning({ id: usersTable.id })
