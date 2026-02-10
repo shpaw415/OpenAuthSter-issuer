@@ -55,7 +55,7 @@ export async function createResponseFromInviteId({
   const response = new Response(null, {
     status: 302,
     headers: {
-      Location: redirectURI,
+      Location: redirectURI + "?invite_flow=true",
     },
   });
 
