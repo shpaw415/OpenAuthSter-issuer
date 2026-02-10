@@ -1,5 +1,4 @@
 import { WebUiInviteLinkTable } from "openauth-webui-shared-types/database";
-import { createInviteIdCookieContent } from "./share";
 import { drizzle, eq } from "openauth-webui-shared-types/drizzle";
 
 export function removeInviteLinkById(
