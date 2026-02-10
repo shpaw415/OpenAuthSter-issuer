@@ -103,7 +103,7 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
       throw new Error(
         "Project origin URL is not set, cannot process invite link",
       );
-    createResponseFromInviteId({
+    await createResponseFromInviteId({
       id: params.inviteID!,
       env,
       redirectURI: project.originURL,
