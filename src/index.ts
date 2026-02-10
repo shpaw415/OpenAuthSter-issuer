@@ -12,15 +12,17 @@ import {
   COOKIE_COPY_TEMPLATE_ID,
   COOKIE_NAME,
   ProviderConfig,
+  COOKIE_INVITE_ID,
 } from "openauth-webui-shared-types";
 
 import DefaultTheme from "./defaults/theme";
 import {
+  insertLog,
   OTFusersTable,
   projectTable,
   uiStyleTable,
 } from "openauth-webui-shared-types/database";
-import { drizzle, eq, and } from "openauth-webui-shared-types/drizzle";
+import { drizzle, eq } from "openauth-webui-shared-types/drizzle";
 import { Theme } from "@openauthjs/openauth/ui/theme";
 import globalOpenAutsterConfig, { subjects } from "../openauth.config";
 import packageJson from "../package.json" assert { type: "json" };
@@ -30,6 +32,11 @@ import {
   userExtractResult,
 } from "./providers-setup";
 import UserEndpoints from "./user-endpoints";
+import {
+  ensureInviteLinkIsValid,
+  removeInviteLinkById,
+  createResponseFromInviteId,
+} from "./invite-link";
 
 async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
   const utilityResponse = UtilityResponse(request);
@@ -87,9 +94,33 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
       return new Response("Unauthorized", { status: 401 });
     }
   }
+
   let res: Response;
   if (params.url.pathname.startsWith("/user-endpoint")) {
     res = await UserEndpoints({ request, env, ctx, project });
+  } else if (params.url.pathname === "/invite") {
+    if (!project.originURL)
+      throw new Error(
+        "Project origin URL is not set, cannot process invite link",
+      );
+    createResponseFromInviteId({
+      id: params.inviteID!,
+      env,
+      redirectURI: project.originURL,
+    })
+      .then((response) => {
+        res = response;
+      })
+      .catch((error) => {
+        log(
+          `Error processing invite link for invite_id: ${params.inviteID}, error: ${
+            (error as Error).message
+          }`,
+        );
+        res = new Response(`Invalid invite link: ${(error as Error).message}`, {
+          status: 400,
+        });
+      });
   }
 
   res ??= await issuer({
@@ -111,14 +142,16 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
         await globalOpenAutsterConfig(env)
       ).register.onSuccessfulRegistration?.(ctx, value, request);
 
-      const userData = await getOrCreateUser(
+      const userData = await getOrCreateUser({
         env,
         value,
-        client_id,
-        project.providers_data.find(
+        clientId: client_id,
+        providerConfig: project.providers_data.find(
           (p) => p.type === value.provider,
         ) as ProviderConfig,
-      );
+        project,
+        inviteID: params.inviteID || null,
+      });
 
       return ctx.subject("user", {
         id: userData.id,
@@ -162,16 +195,39 @@ function getCookiesFromRequest(request: Request): Record<string, string> {
   return cookies;
 }
 
-async function getOrCreateUser(
-  env: Env,
-  value: Record<string, any>,
-  clientId: string,
-  providerConfig: ProviderConfig,
-): Promise<userExtractResult<{}> & { id: string }> {
+async function getOrCreateUser({
+  env,
+  value,
+  clientId,
+  providerConfig,
+  project,
+  inviteID,
+}: {
+  env: Env;
+  value: Record<string, any>;
+  clientId: string;
+  providerConfig: ProviderConfig;
+  project: Project;
+  inviteID: string | null;
+}): Promise<userExtractResult<{}> & { id: string }> {
   const usersTable = OTFusersTable(clientId);
   const userData = await providerConfigMap[
     value.provider as keyof typeof providerConfigMap
   ].parser(value, providerConfig);
+
+  if (project.registerOnInvite) {
+    if (!inviteID)
+      throw new Error("Invite ID is required for registration on invite");
+    await ensureInviteLinkIsValid(inviteID, env).catch((error) => {
+      log(
+        `Error validating invite link for invite_id: ${inviteID}, error: ${
+          (error as Error).message
+        }`,
+      );
+      throw new Error(`Invalid invite link: ${(error as Error).message}`);
+    });
+  }
+
   const dataToStore = { ...userData.data, provider: value.provider };
   const result = (
     await drizzle(env.AUTH_DB)
@@ -197,6 +253,22 @@ async function getOrCreateUser(
   log(
     `Found or created user ${result.id} with data ${JSON.stringify(userData.data)}`,
   );
+
+  await removeInviteLinkById(inviteID!, env).catch((error) => {
+    log(
+      `Error removing invite link for invite_id: ${inviteID}, error: ${
+        (error as Error).message
+      }`,
+    );
+    return insertLog({
+      type: "warning",
+      clientID: clientId,
+      message: `Failed to remove invite link with id ${inviteID} after use: ${(error as Error).message}`,
+      database: env.AUTH_DB,
+      endpoint: "getOrCreateUser in invite flow",
+    });
+  });
+
   return { ...userData, id: result.id };
 }
 
@@ -232,6 +304,7 @@ async function getProjectById(
       clientID: "openauth_webui",
       created_at: new Date().toISOString(),
       codeMode: "email",
+      registerOnInvite: false,
       secret: "",
       authEndpointURL: "",
       cloudflareDomaineID: "",
@@ -255,6 +328,7 @@ async function getProjectById(
 type Params = {
   clientID: string | null;
   copyID: string | null;
+  inviteID: string | null;
   url: URL;
 };
 
@@ -266,6 +340,7 @@ async function requestToParams(request: Request): Promise<Params> {
   const clientIDParams = url.searchParams.get("client_id")?.split("::") as
     | [string, string | null]
     | null;
+  const inviteID = url.searchParams.get("invite_id")?.toString() || null;
   const formData =
     request.method === "POST" ? await request.clone().formData() : null;
   const clientIDParamsForm = formData
@@ -292,6 +367,7 @@ async function requestToParams(request: Request): Promise<Params> {
       cookies[COOKIE_COPY_TEMPLATE_ID] ||
       null,
     url,
+    inviteID: inviteID || cookies[COOKIE_INVITE_ID] || null,
   };
 }
 

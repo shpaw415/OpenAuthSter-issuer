@@ -1,7 +1,17 @@
 import {
   COOKIE_COPY_TEMPLATE_ID,
   COOKIE_NAME,
+  COOKIE_INVITE_ID,
 } from "openauth-webui-shared-types";
+
+export function createInviteIdCookieContent(inviteId: string) {
+  return createCookieContent(COOKIE_INVITE_ID, inviteId, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Strict",
+    maxAge: 60 * 60 * 24 * 1, // 1 days
+  });
+}
 
 export function createClientIdCookieContent(clientId: string) {
   return createCookieContent(COOKIE_NAME, clientId, {
