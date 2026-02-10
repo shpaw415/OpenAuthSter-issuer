@@ -7,8 +7,6 @@ import {
 export function createInviteIdCookieContent(inviteId: string) {
   return createCookieContent(COOKIE_INVITE_ID, inviteId, {
     httpOnly: true,
-    secure: true,
-    sameSite: "Strict",
     maxAge: 60 * 60 * 24 * 1, // 1 days
   });
 }
