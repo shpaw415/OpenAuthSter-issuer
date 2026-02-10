@@ -38,7 +38,7 @@ export async function ensureInviteLinkIsValid(
 
 /**
  * Trigger on the invite link page, set the inviteId cookie and redirect to the home page.
- * The home page will then use the inviteId cookie to complete the invite flow.
+ * The App page will then read the inviteId and copyID search params and trigger the invite flow in the client.
  *
  * *must be triggered on `https://auth.example.com/invite` endpoint*
  */
@@ -46,16 +46,23 @@ export async function createResponseFromInviteId({
   id,
   env,
   redirectURI,
+  copyID,
 }: {
   id: string;
   env: Env;
   redirectURI: string;
+  copyID: string | null;
 }): Promise<Response> {
   await ensureInviteLinkIsValid(id, env);
+
+  const url = new URL(redirectURI);
+  url.searchParams.set("invite_flow", "true");
+  copyID && url.searchParams.set("copyID", copyID);
+
   const response = new Response(null, {
     status: 302,
     headers: {
-      Location: redirectURI + "?invite_flow=true",
+      Location: url.toString(),
     },
   });
 

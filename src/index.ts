@@ -107,6 +107,7 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
       id: params.inviteID!,
       env,
       redirectURI: project.originURL,
+      copyID: params.copyID,
     })
       .then((response) => {
         res = response;
