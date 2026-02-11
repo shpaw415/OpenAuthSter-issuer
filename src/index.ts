@@ -367,6 +367,18 @@ function getCookiesFromRequest(request: Request): Record<string, string> {
   return cookies;
 }
 
+async function userExists(env: Env, identifier: string, clientID: string) {
+  const usersTable = OTFusersTable(clientID);
+  return Boolean(
+    await drizzle(env.AUTH_DB)
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.identifier, identifier))
+      .limit(1)
+      .get(),
+  );
+}
+
 async function getOrCreateUser({
   env,
   value,
@@ -385,7 +397,10 @@ async function getOrCreateUser({
     value.provider as keyof typeof providerConfigMap
   ].parser(value, providerConfig);
 
-  if (project.registerOnInvite) {
+  if (
+    project.registerOnInvite &&
+    !(await userExists(env, userData.identifier, manager.params.clientID!))
+  ) {
     if (!manager.params.inviteID)
       throw new Error("Invite ID is required for registration on invite");
     await ensureInviteLinkIsValid(manager.params.inviteID, env).catch(
