@@ -33,179 +33,336 @@ import {
   userExtractResult,
 } from "./providers-setup";
 import UserEndpoints from "./user-endpoints";
-import {
-  ensureInviteLinkIsValid,
-  removeInviteLinkById,
-  createResponseFromInviteId,
-} from "./invite-link";
+import { ensureInviteLinkIsValid, removeInviteLinkById } from "./invite-link";
 
-async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
-  let params: Params | null = null;
-  let headers: Headers | null = null;
-  let project: Project | null;
-  let res: Response;
-  try {
-    const utilityResponse = UtilityResponse(request);
-    if (utilityResponse) {
-      return utilityResponse;
+class RequestError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+type Params = {
+  clientID: string | null;
+  copyID: string | null;
+  inviteID: string | null;
+  url: URL;
+};
+class RequestManager {
+  public request: Request;
+  public header: Headers;
+  public response: Response | null = null;
+  public params: Params = null as any;
+  public env: Env;
+  public ctx: ExecutionContext;
+
+  constructor(request: Request, env: Env, ctx: ExecutionContext) {
+    this.request = request;
+    this.header = new Headers();
+    this.env = env;
+    this.ctx = ctx;
+  }
+
+  public UtilityResponse() {
+    const url = new URL(this.request.url);
+    switch (url.pathname) {
+      case "/health":
+        this.setResponse(new Response("OK"));
+      case "/version":
+        this.setResponse(new Response(packageJson.version));
+      case "/user-endpoint":
+        if (this.request.method !== "OPTIONS") break;
+        this.setResponse(
+          new Response(null, {
+            status: 204,
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+              "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            },
+          }),
+        );
     }
+    return Boolean(this.response);
+  }
 
-    params = await requestToParams(request);
-    const client_id = params?.clientID;
-    const copyTemplateId = params?.copyID;
-    const inviteID = params?.inviteID;
+  public before() {
+    const { clientID, copyID, inviteID } = this.params;
+    console.log({
+      cookies: { clientID, copyID, inviteID },
+      url: this.request.url,
+    });
+    if (clientID || copyID) {
+      this.header.append("Set-Cookie", createClientIdCookieContent(clientID!));
+    }
+    if (copyID) {
+      this.header.append("Set-Cookie", createCopyIdCookieContent(copyID));
+    }
+    if (inviteID) {
+      this.header.append("Set-Cookie", createInviteIdCookieContent(inviteID));
+    }
+  }
 
-    log(
-      `Incoming request for client_id: ${client_id}, copyTemplateId: ${copyTemplateId}, inviteID: ${inviteID}, url: ${params.url.href}, method: ${request.method}`,
+  public setResponse(response: Response) {
+    if (this.response) return this;
+    this.response = response;
+    return this;
+  }
+
+  public prepare({ project, env }: { project: Project | null; env: Env }) {
+    if (!this.response) return this;
+
+    this.header.forEach((value, key) => {
+      this.response!.headers.append(key, value);
+    });
+
+    this.response.headers.set(
+      "Access-Control-Allow-Origin",
+      project?.originURL || env.WEBUI_ORIGIN_URL,
     );
 
-    headers = new Headers();
+    return this;
+  }
 
-    headers.set("Access-Control-Allow-Credentials", "true");
-    headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    headers.set("Vary", "Origin, Cookie");
-    headers.set("Access-Control-Allow-Origin", "*");
-
-    if (!client_id) return new Response("Missing client_id", { status: 400 });
-    else if (client_id || copyTemplateId)
-      headers.append("Set-Cookie", createClientIdCookieContent(client_id));
-    if (copyTemplateId)
-      headers.append("Set-Cookie", createCopyIdCookieContent(copyTemplateId));
-    if (inviteID)
-      headers.append("Set-Cookie", createInviteIdCookieContent(inviteID));
-
-    project = await getProjectById(client_id, env);
-    if (!project) {
-      log(`Project not found for client_id: ${client_id}`);
-      return Response.json(
-        {
-          error: `Invalid client_id or project not found, (client_id: ${client_id})`,
-        },
-        {
-          status: 400,
-          headers,
-        },
-      );
+  public getResponse(): Response {
+    if (!this.response) {
+      return new Response("Not Found", { status: 404 });
     }
+    return this.response;
+  }
 
+  public async init() {
+    this.header.set("Access-Control-Allow-Credentials", "true");
+    this.header.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    this.header.set(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization",
+    );
+    this.header.set("Vary", "Origin, Cookie");
+    this.header.set("Access-Control-Allow-Origin", "*");
+    this.params = await this.requestToParams();
+    this.before();
+  }
+
+  public ensureSet<T>(check: T, message: string, status: number) {
+    if (check) return check;
+    throw new RequestError(message, status);
+  }
+
+  public async handleWebUIRegister() {
     if (
-      client_id === "openauth_webui" &&
-      request.method === "POST" &&
-      params.url.pathname.endsWith("/register")
+      this.params.clientID === "openauth_webui" &&
+      this.request.method === "POST" &&
+      this.params.url.pathname.endsWith("/register")
     ) {
-      const formData = await request.clone().formData();
+      const formData = await this.request.clone().formData();
       const email = formData.get("email")?.toString().trim();
       if (
         email &&
-        !env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)
+        !this.env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)
       ) {
-        return new Response("Unauthorized", { status: 401 });
+        throw new RequestError(
+          "Unauthorized: Email not allowed for registration",
+          401,
+        );
       }
     }
+  }
 
-    if (params.url.pathname.startsWith("/user-endpoint")) {
-      res = await UserEndpoints({ request, env, ctx, project });
-    } else if (params.url.pathname === "/invite") {
-      if (!project.originURL)
-        throw new Error(
-          "Project origin URL is not set, cannot process invite link",
+  public removeParamCookie(name: "client_id" | "copy_id" | "invite_id") {
+    switch (name) {
+      case "client_id":
+        this.header.append(
+          "Set-Cookie",
+          createClientIdCookieContent("", { maxAge: 0 }),
         );
-      await createResponseFromInviteId({
-        id: params.inviteID!,
-        env,
-        redirectURI: project.originURL,
-        copyID: params.copyID,
-      })
-        .then((response) => {
-          res = response;
-        })
-        .catch((error) => {
-          log(
-            `Error processing invite link for invite_id: ${params?.inviteID}, error: ${
-              (error as Error).message
-            }`,
-          );
-          res = new Response(
-            `Invalid invite link: ${(error as Error).message}`,
-            {
-              status: 400,
-            },
-          );
-        });
+        break;
+      case "copy_id":
+        this.header.append(
+          "Set-Cookie",
+          createCopyIdCookieContent("", { maxAge: 0 }),
+        );
+        break;
+      case "invite_id":
+        this.header.append(
+          "Set-Cookie",
+          createInviteIdCookieContent("", { maxAge: 0 }),
+        );
+        break;
     }
-    res ??= await issuer({
-      storage: D1Storage({
-        database: env.AUTH_DB,
-        table: client_id,
-      }),
-      subjects,
-      providers: await generateProvidersFromConfig({
-        project,
-        env,
-        copyTemplateId,
-      }),
-      theme: await getThemeFromProject(project, env),
-      success: async (ctx, value, request) => {
-        console.log(`Successful authentication with value: `, value);
+  }
 
-        await (
-          await globalOpenAutsterConfig(env)
-        ).register.onSuccessfulRegistration?.(ctx, value, request);
+  public removeAllParamCookies() {
+    (["client_id", "copy_id", "invite_id"] as const).forEach(
+      this.removeParamCookie,
+    );
+  }
 
-        const userData = await getOrCreateUser({
-          env,
-          value,
-          clientId: client_id,
-          providerConfig: project?.providers_data.find(
-            (p) => p.type === value.provider,
-          ) as ProviderConfig,
-          project: project!,
-          inviteID: params?.inviteID || null,
-        });
+  public async handleUserEndpoints(project: Project) {
+    if (this.params.url.pathname.startsWith("/user-endpoint")) {
+      this.setResponse(
+        await UserEndpoints({
+          request: this.request,
+          env: this.env,
+          ctx: this.ctx,
+          project,
+        }),
+      );
+    }
+  }
 
-        return ctx.subject("user", {
-          id: userData.id,
-          data: userData.data,
-          clientID: client_id,
-          provider: value.provider,
-        });
-      },
-      async error(error, req) {
-        console.error(`Error during authentication for ${req.url}:`, error);
-        console.log(req);
-        return Response.json(
-          { error: "Authentication error" },
-          { status: 500 },
-        );
-      },
-    }).fetch(request, env, ctx);
+  private async requestToParams(): Promise<Params> {
+    const url = new URL(this.request.url);
 
-    headers.forEach((value, key) => {
-      res.headers.append(key, value);
-    });
-    res.headers.set(
-      "Access-Control-Allow-Origin",
-      project.originURL || env.WEBUI_ORIGIN_URL,
+    const cookies = getCookiesFromRequest(this.request);
+
+    const clientIDParams = url.searchParams.get("client_id")?.split("::") as
+      | [string, string | null]
+      | null;
+    const inviteID = url.searchParams.get("invite_id")?.toString() || null;
+    const formData =
+      this.request.method === "POST"
+        ? await this.request.clone().formData()
+        : null;
+    const clientIDParamsForm = formData
+      ?.get("client_id")
+      ?.toString()
+      .split("::") as [string, string | null] | null;
+
+    log(
+      `Parsed params - clientIDParams: ${clientIDParams}, clientIDParamsForm: ${clientIDParamsForm}, cookies: ${JSON.stringify(
+        cookies,
+      )}`,
+      formData,
     );
 
-    return res;
+    return {
+      clientID:
+        clientIDParams?.[0] ||
+        clientIDParamsForm?.[0] ||
+        cookies[COOKIE_NAME] ||
+        null,
+      copyID:
+        clientIDParams?.[1] ||
+        clientIDParamsForm?.[1] ||
+        cookies[COOKIE_COPY_TEMPLATE_ID] ||
+        null,
+      url,
+      inviteID: inviteID || cookies[COOKIE_INVITE_ID] || null,
+    };
+  }
+}
+
+async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  let project: Project | null = null;
+  const manager = new RequestManager(request, env, ctx);
+  try {
+    if (manager.UtilityResponse()) return manager.getResponse();
+
+    await manager.init();
+    const {
+      clientID: client_id,
+      copyID: copyTemplateId,
+      inviteID,
+    } = manager.params;
+
+    log(
+      `Incoming request for client_id: ${client_id}, copyTemplateId: ${copyTemplateId}, inviteID: ${inviteID}, url: ${manager.params.url.href}, method: ${request.method}`,
+    );
+    manager.ensureSet(client_id, "Missing client_id", 400);
+
+    project = await getProjectById(client_id!, env);
+    manager.ensureSet(
+      project,
+      `Invalid client_id or project not found, (client_id: ${client_id})`,
+      400,
+    );
+
+    await manager.handleWebUIRegister();
+    await manager.handleUserEndpoints(project!);
+
+    return manager
+      .setResponse(
+        await issuer({
+          storage: D1Storage({
+            database: env.AUTH_DB,
+            table: client_id!,
+          }),
+          subjects,
+          providers: await generateProvidersFromConfig({
+            project: project!,
+            env,
+            copyTemplateId,
+          }),
+          theme: await getThemeFromProject(project!, env),
+          success: async (ctx, value, request) => {
+            console.log(`Successful authentication with value: `, value);
+
+            await (
+              await globalOpenAutsterConfig(env)
+            ).register.onSuccessfulRegistration?.(ctx, value, request);
+
+            const userData = await getOrCreateUser({
+              env,
+              value,
+              manager: manager,
+              providerConfig: project?.providers_data.find(
+                (p) => p.type === value.provider,
+              ) as ProviderConfig,
+              project: project!,
+            });
+
+            return ctx.subject("user", {
+              id: userData.id,
+              data: userData.data,
+              clientID: client_id!,
+              provider: value.provider,
+            });
+          },
+          async error(error, req) {
+            console.error(`Error during authentication for ${req.url}:`, error);
+            console.log(req);
+            throw new Error(
+              `Authentication error: ${(error as Error).message}`,
+            );
+          },
+        }).fetch(request, env, ctx),
+      )
+      .prepare({
+        project,
+        env,
+      })
+      .getResponse();
   } catch (error) {
     log(`Unexpected error in fetch handler: ${(error as Error).message}`, {
       stack: (error as Error).stack,
     });
     await insertLog({
-      clientID: params?.clientID || "unknown",
+      clientID: manager.params?.clientID || "unknown",
       type: "error",
       message: `Unexpected error in fetch handler: ${(error as Error).message}`,
       database: env.AUTH_DB,
       endpoint: "fetch handler",
       context: {
-        params,
+        params: manager.params,
         stack: (error as Error).stack,
-        headers: headers ? Object.fromEntries(headers.entries()) : undefined,
+        headers: Object.fromEntries(manager.header.entries()),
       },
     });
+
+    if (error instanceof RequestError) {
+      manager.setResponse(
+        new Response(error.message, { status: error.status }),
+      );
+      return manager
+        .prepare({
+          project: project,
+          env,
+        })
+        .getResponse();
+    }
+
     return new Response("Internal Server Error", { status: 500 });
   }
 }
@@ -230,34 +387,38 @@ function getCookiesFromRequest(request: Request): Record<string, string> {
 async function getOrCreateUser({
   env,
   value,
-  clientId,
   providerConfig,
   project,
-  inviteID,
+  manager,
 }: {
   env: Env;
   value: Record<string, any>;
-  clientId: string;
   providerConfig: ProviderConfig;
   project: Project;
-  inviteID: string | null;
+  manager: RequestManager;
 }): Promise<userExtractResult<{}> & { id: string }> {
-  const usersTable = OTFusersTable(clientId);
+  const usersTable = OTFusersTable(manager.params.clientID!);
   const userData = await providerConfigMap[
     value.provider as keyof typeof providerConfigMap
   ].parser(value, providerConfig);
 
   if (project.registerOnInvite) {
-    if (!inviteID)
+    if (!manager.params.inviteID)
       throw new Error("Invite ID is required for registration on invite");
-    await ensureInviteLinkIsValid(inviteID, env).catch((error) => {
-      log(
-        `Error validating invite link for invite_id: ${inviteID}, error: ${
-          (error as Error).message
-        }`,
-      );
-      throw new Error(`Invalid invite link: ${(error as Error).message}`);
-    });
+    await ensureInviteLinkIsValid(manager.params.inviteID, env).catch(
+      (error) => {
+        log(
+          `Error validating invite link for invite_id: ${manager.params.inviteID}, error: ${
+            (error as Error).message
+          }`,
+        );
+        manager.removeParamCookie("invite_id");
+        throw new RequestError(
+          `Invalid invite link: ${(error as Error).message}`,
+          401,
+        );
+      },
+    );
   }
 
   const dataToStore = { ...userData.data, provider: value.provider };
@@ -286,20 +447,22 @@ async function getOrCreateUser({
     `Found or created user ${result.id} with data ${JSON.stringify(userData.data)}`,
   );
 
-  await removeInviteLinkById(inviteID!, env).catch((error) => {
-    log(
-      `Error removing invite link for invite_id: ${inviteID}, error: ${
-        (error as Error).message
-      }`,
-    );
-    return insertLog({
-      type: "warning",
-      clientID: clientId,
-      message: `Failed to remove invite link with id ${inviteID} after use: ${(error as Error).message}`,
-      database: env.AUTH_DB,
-      endpoint: "getOrCreateUser in invite flow",
+  await removeInviteLinkById(manager.params.inviteID!, env)
+    .then(() => manager.removeParamCookie("invite_id"))
+    .catch((error) => {
+      log(
+        `Error removing invite link for invite_id: ${manager.params.inviteID}, error: ${
+          (error as Error).message
+        }`,
+      );
+      return insertLog({
+        type: "warning",
+        clientID: manager.params.clientID!,
+        message: `Failed to remove invite link with id ${manager.params.inviteID} after use: ${(error as Error).message}`,
+        database: env.AUTH_DB,
+        endpoint: "getOrCreateUser in invite flow",
+      });
     });
-  });
 
   return { ...userData, id: result.id };
 }
@@ -356,74 +519,3 @@ async function getProjectById(
 
   return parseDBProject(projectData);
 }
-
-type Params = {
-  clientID: string | null;
-  copyID: string | null;
-  inviteID: string | null;
-  url: URL;
-};
-
-async function requestToParams(request: Request): Promise<Params> {
-  const url = new URL(request.url);
-
-  const cookies = getCookiesFromRequest(request);
-
-  const clientIDParams = url.searchParams.get("client_id")?.split("::") as
-    | [string, string | null]
-    | null;
-  const inviteID = url.searchParams.get("invite_id")?.toString() || null;
-  const formData =
-    request.method === "POST" ? await request.clone().formData() : null;
-  const clientIDParamsForm = formData
-    ?.get("client_id")
-    ?.toString()
-    .split("::") as [string, string | null] | null;
-
-  log(
-    `Parsed params - clientIDParams: ${clientIDParams}, clientIDParamsForm: ${clientIDParamsForm}, cookies: ${JSON.stringify(
-      cookies,
-    )}`,
-    formData,
-  );
-
-  return {
-    clientID:
-      clientIDParams?.[0] ||
-      clientIDParamsForm?.[0] ||
-      cookies[COOKIE_NAME] ||
-      null,
-    copyID:
-      clientIDParams?.[1] ||
-      clientIDParamsForm?.[1] ||
-      cookies[COOKIE_COPY_TEMPLATE_ID] ||
-      null,
-    url,
-    inviteID: inviteID || cookies[COOKIE_INVITE_ID] || null,
-  };
-}
-
-// Endpoint Section ////////////////////////////////////////////////
-
-function UtilityResponse(request: Request): Response | null {
-  const url = new URL(request.url);
-  switch (url.pathname) {
-    case "/health":
-      return new Response("OK");
-    case "/version":
-      return new Response(packageJson.version);
-    case "/user-endpoint":
-      if (request.method !== "OPTIONS") break;
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        },
-      });
-  }
-  return null;
-}
-
-// End Endpoint Section ////////////////////////////////////////////

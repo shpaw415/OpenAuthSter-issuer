@@ -34,37 +34,3 @@ export async function ensureInviteLinkIsValid(
     throw new Error("Invite link has expired");
   }
 }
-
-/**
- * Trigger on the invite link page, set the inviteId cookie and redirect to the home page.
- * The App page will then read the inviteId and copyID search params and trigger the invite flow in the client.
- *
- * *must be triggered on `https://auth.example.com/invite` endpoint*
- */
-export async function createResponseFromInviteId({
-  id,
-  env,
-  redirectURI,
-  copyID,
-}: {
-  id: string;
-  env: Env;
-  redirectURI: string;
-  copyID: string | null;
-}): Promise<Response> {
-  await ensureInviteLinkIsValid(id, env);
-
-  const url = new URL(redirectURI);
-  url.searchParams.set("invite_flow", "true");
-  url.searchParams.set("invite_id", id);
-  copyID && url.searchParams.set("copyID", copyID);
-
-  const response = new Response(null, {
-    status: 302,
-    headers: {
-      Location: url.toString(),
-    },
-  });
-
-  return response;
-}

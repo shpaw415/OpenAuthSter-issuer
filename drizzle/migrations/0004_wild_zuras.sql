@@ -1,0 +1,1 @@
+ALTER TABLE `openauth_webui_logs` ADD `context` text;
