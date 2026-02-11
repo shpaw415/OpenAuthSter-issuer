@@ -217,38 +217,21 @@ class RequestManager {
 
     const cookies = getCookiesFromRequest(this.request);
 
-    const clientIDParams = url.searchParams.get("client_id")?.split("::") as
-      | [string, string | null]
-      | null;
+    const clientIDParams =
+      url.searchParams.get("client_id")?.toString() || null;
+    const copyIDParams = url.searchParams.get("copy_id")?.toString() || null;
     const inviteID = url.searchParams.get("invite_id")?.toString() || null;
-    const formData =
-      this.request.method === "POST"
-        ? await this.request.clone().formData()
-        : null;
-    const clientIDParamsForm = formData
-      ?.get("client_id")
-      ?.toString()
-      .split("::") as [string, string | null] | null;
 
     log(
-      `Parsed params - clientIDParams: ${clientIDParams}, clientIDParamsForm: ${clientIDParamsForm}, cookies: ${JSON.stringify(
+      `Parsed params - clientIDParams: ${clientIDParams}, cookies: ${JSON.stringify(
         cookies,
       )}`,
-      formData,
     );
 
     return {
-      clientID:
-        clientIDParams?.[0] ||
-        clientIDParamsForm?.[0] ||
-        cookies[COOKIE_NAME] ||
-        null,
-      copyID:
-        clientIDParams?.[1] ||
-        clientIDParamsForm?.[1] ||
-        cookies[COOKIE_COPY_TEMPLATE_ID] ||
-        null,
       url,
+      clientID: clientIDParams || cookies[COOKIE_NAME] || null,
+      copyID: copyIDParams || cookies[COOKIE_COPY_TEMPLATE_ID] || null,
       inviteID: inviteID || cookies[COOKIE_INVITE_ID] || null,
     };
   }
