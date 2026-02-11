@@ -4,6 +4,7 @@ import { D1Storage } from "./db/d1-adapter";
 import {
   createClientIdCookieContent,
   createCopyIdCookieContent,
+  createInviteIdCookieContent,
   log,
 } from "./share";
 import {
@@ -39,144 +40,174 @@ import {
 } from "./invite-link";
 
 async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
-  const utilityResponse = UtilityResponse(request);
-  if (utilityResponse) {
-    return utilityResponse;
-  }
-
-  const params = await requestToParams(request);
-  const client_id = params.clientID;
-  const copyTemplateId = params.copyID;
-
-  log(
-    `Incoming request for client_id: ${client_id}, copyTemplateId: ${copyTemplateId}, url: ${params.url.href}, method: ${request.method}`,
-  );
-
-  const headers = new Headers();
-
-  headers.set("Access-Control-Allow-Credentials", "true");
-  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  headers.set("Vary", "Origin, Cookie");
-  headers.set("Access-Control-Allow-Origin", "*");
-
-  if (!client_id) return new Response("Missing client_id", { status: 400 });
-  else if (client_id || copyTemplateId)
-    headers.append("Set-Cookie", createClientIdCookieContent(client_id));
-  if (copyTemplateId)
-    headers.append("Set-Cookie", createCopyIdCookieContent(copyTemplateId));
-
-  const project = await getProjectById(client_id, env);
-  if (!project) {
-    log(`Project not found for client_id: ${client_id}`);
-    return Response.json(
-      {
-        error: `Invalid client_id or project not found, (client_id: ${client_id})`,
-      },
-      {
-        status: 400,
-        headers,
-      },
-    );
-  }
-
-  if (
-    client_id === "openauth_webui" &&
-    request.method === "POST" &&
-    params.url.pathname.endsWith("/register")
-  ) {
-    const formData = await request.clone().formData();
-    const email = formData.get("email")?.toString().trim();
-    if (
-      email &&
-      !env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)
-    ) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-  }
-
+  let params: Params | null = null;
+  let headers: Headers | null = null;
+  let project: Project | null;
   let res: Response;
-  if (params.url.pathname.startsWith("/user-endpoint")) {
-    res = await UserEndpoints({ request, env, ctx, project });
-  } else if (params.url.pathname === "/invite") {
-    if (!project.originURL)
-      throw new Error(
-        "Project origin URL is not set, cannot process invite link",
-      );
-    await createResponseFromInviteId({
-      id: params.inviteID!,
-      env,
-      redirectURI: project.originURL,
-      copyID: params.copyID,
-    })
-      .then((response) => {
-        res = response;
-      })
-      .catch((error) => {
-        log(
-          `Error processing invite link for invite_id: ${params.inviteID}, error: ${
-            (error as Error).message
-          }`,
-        );
-        res = new Response(`Invalid invite link: ${(error as Error).message}`, {
+  try {
+    const utilityResponse = UtilityResponse(request);
+    if (utilityResponse) {
+      return utilityResponse;
+    }
+
+    params = await requestToParams(request);
+    const client_id = params?.clientID;
+    const copyTemplateId = params?.copyID;
+    const inviteID = params?.inviteID;
+
+    log(
+      `Incoming request for client_id: ${client_id}, copyTemplateId: ${copyTemplateId}, inviteID: ${inviteID}, url: ${params.url.href}, method: ${request.method}`,
+    );
+
+    headers = new Headers();
+
+    headers.set("Access-Control-Allow-Credentials", "true");
+    headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    headers.set("Vary", "Origin, Cookie");
+    headers.set("Access-Control-Allow-Origin", "*");
+
+    if (!client_id) return new Response("Missing client_id", { status: 400 });
+    else if (client_id || copyTemplateId)
+      headers.append("Set-Cookie", createClientIdCookieContent(client_id));
+    if (copyTemplateId)
+      headers.append("Set-Cookie", createCopyIdCookieContent(copyTemplateId));
+    if (inviteID)
+      headers.append("Set-Cookie", createInviteIdCookieContent(inviteID));
+
+    project = await getProjectById(client_id, env);
+    if (!project) {
+      log(`Project not found for client_id: ${client_id}`);
+      return Response.json(
+        {
+          error: `Invalid client_id or project not found, (client_id: ${client_id})`,
+        },
+        {
           status: 400,
-        });
-      });
-  }
+          headers,
+        },
+      );
+    }
 
-  res ??= await issuer({
-    storage: D1Storage({
-      database: env.AUTH_DB,
-      table: client_id,
-    }),
-    subjects,
-    providers: await generateProvidersFromConfig({
-      project,
-      env,
-      copyTemplateId,
-    }),
-    theme: await getThemeFromProject(project, env),
-    success: async (ctx, value, request) => {
-      console.log(`Successful authentication with value: `, value);
+    if (
+      client_id === "openauth_webui" &&
+      request.method === "POST" &&
+      params.url.pathname.endsWith("/register")
+    ) {
+      const formData = await request.clone().formData();
+      const email = formData.get("email")?.toString().trim();
+      if (
+        email &&
+        !env.WEBUI_ADMIN_EMAILS.split(",").some((e) => e.trim() === email)
+      ) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+    }
 
-      await (
-        await globalOpenAutsterConfig(env)
-      ).register.onSuccessfulRegistration?.(ctx, value, request);
-
-      const userData = await getOrCreateUser({
+    if (params.url.pathname.startsWith("/user-endpoint")) {
+      res = await UserEndpoints({ request, env, ctx, project });
+    } else if (params.url.pathname === "/invite") {
+      if (!project.originURL)
+        throw new Error(
+          "Project origin URL is not set, cannot process invite link",
+        );
+      await createResponseFromInviteId({
+        id: params.inviteID!,
         env,
-        value,
-        clientId: client_id,
-        providerConfig: project.providers_data.find(
-          (p) => p.type === value.provider,
-        ) as ProviderConfig,
+        redirectURI: project.originURL,
+        copyID: params.copyID,
+      })
+        .then((response) => {
+          res = response;
+        })
+        .catch((error) => {
+          log(
+            `Error processing invite link for invite_id: ${params?.inviteID}, error: ${
+              (error as Error).message
+            }`,
+          );
+          res = new Response(
+            `Invalid invite link: ${(error as Error).message}`,
+            {
+              status: 400,
+            },
+          );
+        });
+    }
+    res ??= await issuer({
+      storage: D1Storage({
+        database: env.AUTH_DB,
+        table: client_id,
+      }),
+      subjects,
+      providers: await generateProvidersFromConfig({
         project,
-        inviteID: params.inviteID || null,
-      });
+        env,
+        copyTemplateId,
+      }),
+      theme: await getThemeFromProject(project, env),
+      success: async (ctx, value, request) => {
+        console.log(`Successful authentication with value: `, value);
 
-      return ctx.subject("user", {
-        id: userData.id,
-        data: userData.data,
-        clientID: client_id,
-        provider: value.provider,
-      });
-    },
-    async error(error, req) {
-      console.error(`Error during authentication for ${req.url}:`, error);
-      console.log(req);
-      return Response.json({ error: "Authentication error" }, { status: 500 });
-    },
-  }).fetch(request, env, ctx);
+        await (
+          await globalOpenAutsterConfig(env)
+        ).register.onSuccessfulRegistration?.(ctx, value, request);
 
-  headers.forEach((value, key) => {
-    res.headers.append(key, value);
-  });
-  res.headers.set(
-    "Access-Control-Allow-Origin",
-    project.originURL || env.WEBUI_ORIGIN_URL,
-  );
+        const userData = await getOrCreateUser({
+          env,
+          value,
+          clientId: client_id,
+          providerConfig: project?.providers_data.find(
+            (p) => p.type === value.provider,
+          ) as ProviderConfig,
+          project: project!,
+          inviteID: params?.inviteID || null,
+        });
 
-  return res;
+        return ctx.subject("user", {
+          id: userData.id,
+          data: userData.data,
+          clientID: client_id,
+          provider: value.provider,
+        });
+      },
+      async error(error, req) {
+        console.error(`Error during authentication for ${req.url}:`, error);
+        console.log(req);
+        return Response.json(
+          { error: "Authentication error" },
+          { status: 500 },
+        );
+      },
+    }).fetch(request, env, ctx);
+
+    headers.forEach((value, key) => {
+      res.headers.append(key, value);
+    });
+    res.headers.set(
+      "Access-Control-Allow-Origin",
+      project.originURL || env.WEBUI_ORIGIN_URL,
+    );
+
+    return res;
+  } catch (error) {
+    log(`Unexpected error in fetch handler: ${(error as Error).message}`, {
+      stack: (error as Error).stack,
+    });
+    await insertLog({
+      clientID: params?.clientID || "unknown",
+      type: "error",
+      message: `Unexpected error in fetch handler: ${(error as Error).message}`,
+      database: env.AUTH_DB,
+      endpoint: "fetch handler",
+      context: {
+        params,
+        stack: (error as Error).stack,
+        headers: headers ? Object.fromEntries(headers.entries()) : undefined,
+      },
+    });
+    return new Response("Internal Server Error", { status: 500 });
+  }
 }
 
 export default {
