@@ -184,6 +184,45 @@ wrangler dev --port 8788
 
 The server will be available at `http://localhost:8788`
 
+## API Endpoints
+
+The issuer exposes several REST API endpoints for user and session management:
+
+### User Management (Admin)
+
+Requires authentication with client secret via `X-Client-Secret` header.
+
+- **GET** `/user/:clientID/:userID` - Get user details by ID
+- **PUT** `/user/:clientID/:userID` - Update user (identifier and session data)
+- **DELETE** `/user/:clientID/:userID` - Delete user by ID
+- **GET** `/users/:clientID?page=1&limit=10` - List users with pagination
+
+### Session Management
+
+Requires authentication with Bearer token via `Authorization` header.
+
+**Public Session** (accessible from browser):
+
+- **GET** `/session/public/:clientID` - Get public session data
+- **PATCH** `/session/public/:clientID` - Update public session data
+- **DELETE** `/session/public/:clientID` - Clear public session data
+
+**Private Session** (server-side only, requires secret):
+
+- **GET** `/session/private/:clientID` - Get private session data
+- **PATCH** `/session/private/:clientID` - Update private session data
+- **DELETE** `/session/private/:clientID` - Clear private session data
+
+### Utility Endpoints
+
+- **GET** `/health` - Health check
+- **GET** `/version` - Get OpenAuthster issuer version
+- **GET** `/cleanup` - Clear authentication cookies (testing)
+
+### Authentication Endpoints
+
+All OpenAuth standard endpoints are available at `/*` for OAuth flows.
+
 ## Project Structure
 
 ```
@@ -195,7 +234,8 @@ openauth-multitenant-server/  # (GitHub: OpenAuthSter-issuer)
 │   ├── client/               # Client-side utilities
 │   ├── db/                   # Database schema and adapters
 │   ├── defaults/             # Default themes and email templates
-│   └── endpoints/            # API endpoints
+│   └── endpoints/
+│       └── index.ts          # API endpoints (Hono-based)
 ├── drizzle/                  # Database migrations
 ├── openauth.config.ts        # OpenAuth configuration
 └── wrangler.json             # Cloudflare Worker configuration
