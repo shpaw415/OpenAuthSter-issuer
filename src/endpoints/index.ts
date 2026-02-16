@@ -752,6 +752,7 @@ endpoints.use(
     if (!isAdmin) {
       return c.json({ error: "Unauthorized: Not an admin email" }, 401);
     }
+    return next();
   }),
 );
 
