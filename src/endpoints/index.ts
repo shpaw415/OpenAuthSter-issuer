@@ -743,6 +743,8 @@ endpoints.use(
     if (params.clientID !== PUBLIC_CLIENT_ID || c.req.method !== "POST")
       return next();
     const fd = await c.req.raw.clone().formData();
+    const action = fd.get("action")?.toString() as "register" | "verify";
+    if (action !== "register") return next();
     const email = fd.get("email")?.toString();
     const isAdmin = (c.env as Env).WEBUI_ADMIN_EMAILS.split(",")
       .map((email) => email.trim())
