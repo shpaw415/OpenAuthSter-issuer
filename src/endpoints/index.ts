@@ -52,7 +52,7 @@ import packageJson from "../../package.json" assert { type: "json" };
 import { ensureInviteLinkIsValid, removeInviteLinkById } from "../invite-link";
 
 import { parse } from "valibot";
-import { getCache, setCache } from "../cache";
+import { deleteCache, getCache, setCache } from "../cache";
 
 class PartialRequestError extends Error {
   status: ContentfulStatusCode;
@@ -136,6 +136,18 @@ endpoints.get("/cleanup", async (c) => {
   setCookie(c, COOKIE_COPY_TEMPLATE_ID, "", { expires: new Date() });
   setCookie(c, COOKIE_INVITE_ID, "", { expires: new Date() });
 
+  return c.json({ status: "ok" }, 200);
+});
+
+/**
+ * ClearCache endpoint for clearing the project cache
+ * **Will be used in the v0.3.0 of the webUI**
+ */
+endpoints.get("/clear-cache/:key", (c) => {
+  const key = c.req.param("key");
+  if (key) {
+    deleteCache(key);
+  }
   return c.json({ status: "ok" }, 200);
 });
 

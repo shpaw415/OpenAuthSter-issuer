@@ -13,3 +13,7 @@ export function getCache<Result>(key: string): Result | null {
 export function setCache<Result>(key: string, value: Result, ttlMs = 60000) {
   cache.set(key, { value, exp: Date.now() + ttlMs });
 }
+
+export function deleteCache(key: string) {
+  cache.delete(key);
+}
