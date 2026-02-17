@@ -166,7 +166,7 @@ endpoints.use(
 
     c.set("params", params);
     if (params.clientID) {
-      c.set("project", await getProjectById(params.clientID, c.env.AUTH_DB));
+      c.set("project", await getProjectById(params.clientID, c.env));
     }
 
     await next();
@@ -201,11 +201,12 @@ endpoints.use(
       "Content-Type, Authorization, Cookie",
     );
 
-    if (c.req.method === "OPTIONS") return; // skip for preflight requests
+    if (c.req.method === "OPTIONS") return;
     c.header(
       "Access-Control-Allow-Origin",
       c.get("project")?.originURL || c.env.WEBUI_ORIGIN_URL,
     );
+    return;
   }),
 );
 
@@ -721,7 +722,7 @@ endpoints.use(
       return c.json({ error: "Unauthorized: Missing client ID" }, 401);
     }
 
-    const project = await getProjectById(params.clientID, c.env);
+    const project = c.get("project") as Project | undefined;
     if (!project) {
       return c.json(
         {
@@ -820,23 +821,17 @@ async function getProjectById(
   clientId: string,
   env: Env,
 ): Promise<null | Project> {
-  const projectData = await drizzle(env.AUTH_DB)
-    .select()
-    .from(projectTable)
-    .where(eq(projectTable.clientID, clientId))
-    .limit(1)
-    .get();
-
-  if (!projectData && clientId === "openauth_webui") {
+  if (clientId === PUBLIC_CLIENT_ID) {
     return {
       active: true,
-      clientID: "openauth_webui",
+      clientID: PUBLIC_CLIENT_ID,
       created_at: new Date().toISOString(),
       codeMode: "email",
       registerOnInvite: false,
       secret: "",
       authEndpointURL: "",
       cloudflareDomaineID: "",
+      originURL: env.WEBUI_ORIGIN_URL,
       providers_data: [
         {
           type: "password",
@@ -846,6 +841,12 @@ async function getProjectById(
       ],
     } satisfies Project;
   }
+
+  const projectData = await drizzle(env.AUTH_DB)
+    .select()
+    .from(projectTable)
+    .where(eq(projectTable.clientID, clientId))
+    .get();
 
   if (!projectData) {
     return null;
