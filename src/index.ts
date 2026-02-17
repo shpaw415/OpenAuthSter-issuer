@@ -10,7 +10,7 @@ globalThis.isLog ??= false;
 
 async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
   //@ts-ignore
-  if (env.LOG_ENABLED) globalThis.isLog = true;
+  if (env.LOG_ENABLED == "true") globalThis.isLog = true;
   try {
     return await endpoints.fetch(request, env, ctx);
   } catch (error) {
