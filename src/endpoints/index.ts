@@ -456,6 +456,7 @@ endpoints
         clientID: c.req.param("clientID"),
         env: c.env,
         ctx: c.executionCtx,
+        request: c.req.raw,
       });
 
       const userSession = await getUserPublicData(
@@ -484,6 +485,7 @@ endpoints
         clientID: c.req.param("clientID"),
         env: c.env,
         ctx: c.executionCtx,
+        request: c.req.raw,
       });
 
       const data = await c.req.json();
@@ -523,6 +525,7 @@ endpoints
         clientID: c.req.param("clientID"),
         env: c.env,
         ctx: c.executionCtx,
+        request: c.req.raw,
       });
 
       const updateResult = await updateUserPublicData({
@@ -571,6 +574,7 @@ endpoints
         clientID: c.req.param("clientID"),
         env: c.env,
         ctx: c.executionCtx,
+        request: c.req.raw,
       });
 
       const responseData = await getUserPrivateData({
@@ -619,6 +623,7 @@ endpoints
         clientID: c.req.param("clientID"),
         env: c.env,
         ctx: c.executionCtx,
+        request: c.req.raw,
       });
 
       const updateResult = await updateUserPrivateData({
@@ -669,6 +674,7 @@ endpoints
         clientID: c.req.param("clientID"),
         env: c.env,
         ctx: c.executionCtx,
+        request: c.req.raw,
       });
 
       const updateResult = await updateUserPrivateData({
@@ -1072,19 +1078,25 @@ async function ensureToken({
   clientID,
   env,
   ctx,
+  request,
 }: {
   token: string | null;
   clientID: string;
   env: Env;
   ctx: ExecutionContext;
+  request: Request;
 }) {
   if (!token) {
     throw new PartialRequestError("Unauthorized: Missing token", 401);
   }
+
+  const origin = new URL(request.url).origin;
+
   const selfClient = createSelfClient({
     env,
     ctx,
     clientID,
+    url: origin,
   });
 
   console.log({ selfClient, token, subjects });
@@ -1100,14 +1112,16 @@ function createSelfClient({
   env,
   ctx,
   clientID,
+  url,
 }: {
   env: Env;
   ctx: ExecutionContext;
   clientID: string;
+  url?: string;
 }) {
   return createClient({
     clientID,
-    issuer: env.ISSUER_URL,
+    issuer: url ?? env.ISSUER_URL,
     async fetch(input, init) {
       const url = new URL(input);
       url.searchParams.append("client_id", clientID);
