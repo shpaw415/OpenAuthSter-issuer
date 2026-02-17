@@ -165,6 +165,9 @@ endpoints.use(
     });
 
     c.set("params", params);
+    if (params.clientID) {
+      c.set("project", await getProjectById(params.clientID, c.env.AUTH_DB));
+    }
 
     await next();
 
@@ -727,8 +730,6 @@ endpoints.use(
         401,
       );
     }
-
-    c.set("project", project);
     return next();
   }),
 );
@@ -843,7 +844,7 @@ async function getProjectById(
           data: {},
         },
       ],
-    };
+    } satisfies Project;
   }
 
   if (!projectData) {
