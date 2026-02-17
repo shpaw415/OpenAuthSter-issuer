@@ -1102,7 +1102,7 @@ function createSelfClient({
     async fetch(input, init) {
       const url = new URL(input);
       url.searchParams.append("client_id", clientID);
-      return endpoints.fetch(new Request(url.toString(), init), env, ctx);
+      return Issuer.fetch(new Request(url.toString(), init), env, ctx);
     },
   });
 }
