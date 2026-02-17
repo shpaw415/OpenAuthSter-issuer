@@ -451,12 +451,12 @@ endpoints
   .get("/session/public/:clientID", async (c) => {
     const token = getTokenFromRequest(c.req.raw);
     try {
-      const userInfo = await ensureToken(
+      const userInfo = await ensureToken({
         token,
-        c.req.param("clientID"),
-        c.env,
-        c.executionCtx,
-      );
+        clientID: c.req.param("clientID"),
+        env: c.env,
+        ctx: c.executionCtx,
+      });
 
       const userSession = await getUserPublicData(
         userInfo.id,
@@ -479,12 +479,12 @@ endpoints
   })
   .patch("/session/public/:clientID", async (c) => {
     try {
-      const userInfo = await ensureToken(
-        getTokenFromRequest(c.req.raw),
-        c.req.param("clientID"),
-        c.env,
-        c.executionCtx,
-      );
+      const userInfo = await ensureToken({
+        token: getTokenFromRequest(c.req.raw),
+        clientID: c.req.param("clientID"),
+        env: c.env,
+        ctx: c.executionCtx,
+      });
 
       const data = await c.req.json();
 
@@ -518,12 +518,12 @@ endpoints
   })
   .delete("/session/public/:clientID", async (c) => {
     try {
-      const userInfo = await ensureToken(
-        getTokenFromRequest(c.req.raw),
-        c.req.param("clientID"),
-        c.env,
-        c.executionCtx,
-      );
+      const userInfo = await ensureToken({
+        token: getTokenFromRequest(c.req.raw),
+        clientID: c.req.param("clientID"),
+        env: c.env,
+        ctx: c.executionCtx,
+      });
 
       const updateResult = await updateUserPublicData({
         userID: userInfo.id,
@@ -566,12 +566,12 @@ endpoints
     const secret = getSecretFromRequest(c.req.raw);
     try {
       await ensureSecret(secret, c.req.param("clientID"), c.env.AUTH_DB);
-      const userInfo = await ensureToken(
+      const userInfo = await ensureToken({
         token,
-        c.req.param("clientID"),
-        c.env,
-        c.executionCtx,
-      );
+        clientID: c.req.param("clientID"),
+        env: c.env,
+        ctx: c.executionCtx,
+      });
 
       const responseData = await getUserPrivateData({
         userID: userInfo.id,
@@ -614,12 +614,12 @@ endpoints
     const secret = getSecretFromRequest(c.req.raw);
     try {
       await ensureSecret(secret, c.req.param("clientID"), c.env.AUTH_DB);
-      const userInfo = await ensureToken(
+      const userInfo = await ensureToken({
         token,
-        c.req.param("clientID"),
-        c.env,
-        c.executionCtx,
-      );
+        clientID: c.req.param("clientID"),
+        env: c.env,
+        ctx: c.executionCtx,
+      });
 
       const updateResult = await updateUserPrivateData({
         userID: userInfo.id,
@@ -664,12 +664,12 @@ endpoints
     const secret = getSecretFromRequest(c.req.raw);
     try {
       await ensureSecret(secret, c.req.param("clientID"), c.env.AUTH_DB);
-      const userInfo = await ensureToken(
+      const userInfo = await ensureToken({
         token,
-        c.req.param("clientID"),
-        c.env,
-        c.executionCtx,
-      );
+        clientID: c.req.param("clientID"),
+        env: c.env,
+        ctx: c.executionCtx,
+      });
 
       const updateResult = await updateUserPrivateData({
         userID: userInfo.id,
@@ -1060,12 +1060,17 @@ async function ensureSecret(
   return project.secret;
 }
 
-async function ensureToken(
-  token: string | null,
-  clientID: string,
-  env: Env,
-  ctx: ExecutionContext,
-) {
+async function ensureToken({
+  token,
+  clientID,
+  env,
+  ctx,
+}: {
+  token: string | null;
+  clientID: string;
+  env: Env;
+  ctx: ExecutionContext;
+}) {
   if (!token) {
     throw new PartialRequestError("Unauthorized: Missing token", 401);
   }
