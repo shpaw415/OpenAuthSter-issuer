@@ -52,6 +52,7 @@ import packageJson from "../../package.json" assert { type: "json" };
 import { ensureInviteLinkIsValid, removeInviteLinkById } from "../invite-link";
 
 import { parse } from "valibot";
+import { getCache, setCache } from "../cache";
 
 class PartialRequestError extends Error {
   status: ContentfulStatusCode;
@@ -864,7 +865,6 @@ endpoints.all("*", async (c) => {
 
 // Auth helper functions //////////////////////////////////////////////////////
 
-const currentProjectCache = new Map<string, Project>();
 async function getProjectById(
   clientId: string,
   env: Env,
@@ -890,8 +890,9 @@ async function getProjectById(
     } satisfies Project;
   }
 
-  if (currentProjectCache.has(clientId)) {
-    return currentProjectCache.get(clientId)!;
+  const cachedProject = getCache<Project>(clientId);
+  if (cachedProject) {
+    return cachedProject;
   }
 
   const projectData = await drizzle(env.AUTH_DB)
@@ -904,7 +905,7 @@ async function getProjectById(
     throw new Error(`Project with clientID ${clientId} not found`);
 
   const project = parseDBProject(projectData);
-  currentProjectCache.set(clientId, project);
+  setCache<Project>(clientId, project);
   return project;
 }
 
