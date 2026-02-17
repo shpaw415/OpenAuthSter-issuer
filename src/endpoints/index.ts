@@ -1102,8 +1102,6 @@ async function ensureToken({
     url: origin,
   });
 
-  console.log({ selfClient, token, subjects });
-
   const verified = await selfClient.verify(subjects, token);
   if (verified.err) {
     throw new PartialRequestError("Unauthorized: Invalid token", 401);
