@@ -200,6 +200,8 @@ endpoints.use(
       "Access-Control-Allow-Headers",
       "Content-Type, Authorization, Cookie",
     );
+    c.header("Cache-Control", "no-store");
+    c.header("Vary", "Origin");
 
     if (c.req.method === "OPTIONS") return;
     c.header(
