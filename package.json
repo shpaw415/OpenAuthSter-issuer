@@ -2,7 +2,7 @@
   "name": "openauthster-issuer-server",
   "description": "Deploy an OpenAuthSter issuer server on Cloudflare Workers.",
   "module": "true",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "cloudflare": {
     "label": "OpenAuthSter Issuer Server",
     "products": [
