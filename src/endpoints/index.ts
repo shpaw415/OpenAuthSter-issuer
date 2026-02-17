@@ -817,6 +817,7 @@ endpoints.all("*", async (c) => {
 
 // Auth helper functions //////////////////////////////////////////////////////
 
+const currentProjectCache = new Map<string, Project>();
 async function getProjectById(
   clientId: string,
   env: Env,
@@ -842,6 +843,10 @@ async function getProjectById(
     } satisfies Project;
   }
 
+  if (currentProjectCache.has(clientId)) {
+    return currentProjectCache.get(clientId)!;
+  }
+
   const projectData = await drizzle(env.AUTH_DB)
     .select()
     .from(projectTable)
@@ -852,7 +857,9 @@ async function getProjectById(
     return null;
   }
 
-  return parseDBProject(projectData);
+  const project = parseDBProject(projectData);
+  currentProjectCache.set(clientId, project);
+  return project;
 }
 
 async function getThemeFromProject(project: Project, env: Env): Promise<Theme> {
@@ -1098,7 +1105,7 @@ function createSelfClient({
 }) {
   return createClient({
     clientID,
-    issuer: env.ISSUER_URL || "http://proxy.localhost",
+    issuer: env.ISSUER_URL,
     async fetch(input, init) {
       const url = new URL(input);
       url.searchParams.append("client_id", clientID);
