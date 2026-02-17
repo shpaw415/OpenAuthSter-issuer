@@ -204,7 +204,9 @@ endpoints.use(
     if (c.req.method === "OPTIONS") return;
     c.header(
       "Access-Control-Allow-Origin",
-      c.get("project")?.originURL || c.env.WEBUI_ORIGIN_URL,
+      c.get("project")?.originURL ||
+        (await getProjectById(params.clientID!, c.env))?.originURL ||
+        c.env.WEBUI_ORIGIN_URL,
     );
   }),
 );
@@ -727,7 +729,9 @@ endpoints.use(
       return c.json({ error: "Unauthorized: Missing client ID" }, 401);
     }
 
-    const project = c.get("project") as Project | undefined;
+    const project =
+      (c.get("project") as Project | undefined) ||
+      (await getProjectById(params.clientID!, c.env));
     if (!project) {
       return c.json(
         {
