@@ -71,10 +71,8 @@ export function createCookieContent(
 
   return cookieString;
 }
-const islog = false;
-
 export function log(...args: any[]) {
-  if (islog) {
+  if (globalThis.isLog) {
     console.log(...args);
   }
 }

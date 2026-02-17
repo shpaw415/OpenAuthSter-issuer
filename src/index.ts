@@ -2,7 +2,15 @@ import { log } from "./share";
 import { insertLog } from "openauth-webui-shared-types/database";
 import { endpoints, RequestError } from "./endpoints";
 
+declare global {
+  var isLog: boolean;
+}
+
+globalThis.isLog ??= false;
+
 async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
+  //@ts-ignore
+  if (env.LOG_ENABLED) globalThis.isLog = true;
   try {
     return await endpoints.fetch(request, env, ctx);
   } catch (error) {
