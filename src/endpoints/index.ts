@@ -206,7 +206,6 @@ endpoints.use(
       "Access-Control-Allow-Origin",
       c.get("project")?.originURL || c.env.WEBUI_ORIGIN_URL,
     );
-    return;
   }),
 );
 
@@ -768,7 +767,8 @@ endpoints.use(
 
 endpoints.all("*", async (c) => {
   const params: Params = c.get("params");
-  const project: Project = c.get("project");
+  const project: Project =
+    c.get("project") || (await getProjectById(params.clientID!, c.env));
   return await issuer({
     storage: D1Storage({
       database: c.env.AUTH_DB,
@@ -859,9 +859,8 @@ async function getProjectById(
     .where(eq(projectTable.clientID, clientId))
     .get();
 
-  if (!projectData) {
-    return null;
-  }
+  if (!projectData)
+    throw new Error(`Project with clientID ${clientId} not found`);
 
   const project = parseDBProject(projectData);
   currentProjectCache.set(clientId, project);
