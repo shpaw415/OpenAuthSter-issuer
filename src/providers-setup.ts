@@ -261,6 +261,7 @@ function OAuth2Fetcher<UserInfo>(
   return fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
+      "User-Agent": "OpenAuthSter Issuer",
       ...extraHeaders,
     },
   })
@@ -453,14 +454,7 @@ const codeConfigBuilder: ConfigType<
 
 type AppleSuccessValues =
   | { id: JWTPayload; clientID: string }
-  | {
-      tokenset: {
-        access: string;
-        refresh: any;
-        expiry: number;
-        raw: Record<string, any>;
-      };
-    };
+  | { tokenset: TokenSet; clientID: string };
 
 const appleBuilder: ConfigType<
   AppleOAuthProviderConfig | AppleOIDCProviderConfig,
@@ -479,14 +473,19 @@ const appleBuilder: ConfigType<
   },
   parser: async (data) => {
     if ("tokenset" in data) {
-      // OAuth2 flow, we need to fetch the user info from the Apple API
-      const res = await OAuth2Fetcher<Record<string, any>>(
-        "https://appleid.apple.com/auth/tokeninfo",
-        data.tokenset.access,
-      );
+      // OAuth2 flow — Apple has no REST userinfo API; decode the id_token JWT
+      const idToken = data.tokenset.raw.id_token as string | undefined;
+      if (!idToken) {
+        throw new Error(
+          "Apple OAuth2 token response did not include an id_token",
+        );
+      }
+      const payload = JSON.parse(
+        atob(idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+      ) as Record<string, any>;
       return {
-        identifier: "apple-oauth",
-        data: res,
+        identifier: payload.sub as string,
+        data: payload,
       };
     } else {
       // OIDC flow, we can get the user info from the id token claims
@@ -535,38 +534,68 @@ const xBuilder: ConfigType<
 
 // slack Provider /////////////////////////////
 
+export type SlackUserInfo = {
+  sub: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  given_name?: string;
+  family_name?: string;
+  locale?: string;
+  [key: string]: unknown;
+};
+
 const slackBuilder: ConfigType<
   SlackProviderConfig,
-  { claims: Record<string, any> },
-  Record<string, any>
+  { tokenset: TokenSet; clientID: string },
+  SlackUserInfo
 > = {
   provider: ({ providerConfig }) =>
     import("@openauthjs/openauth/provider/slack").then((mod) =>
       mod.SlackProvider(providerConfig.data),
     ),
-  parser: (data) => {
+  parser: async (data) => {
+    const info = await OAuth2Fetcher<SlackUserInfo>(
+      "https://slack.com/api/openid.connect.userInfo",
+      data.tokenset.access,
+    );
     return {
-      identifier: data.claims.email || data.claims.sub,
-      data: data.claims,
+      identifier: info.sub || info.email!,
+      data: info,
     };
   },
 };
 
 // Cognito Provider /////////////////////////////
 
+export type CognitoUserInfo = {
+  sub: string;
+  email?: string;
+  email_verified?: string;
+  username?: string;
+  name?: string;
+  [key: string]: unknown;
+};
+
 const cognitoBuilder: ConfigType<
   CognitoProviderConfig,
-  { claims: Record<string, any> },
-  Record<string, any>
+  { tokenset: TokenSet; clientID: string },
+  CognitoUserInfo
 > = {
   provider: ({ providerConfig }) =>
     import("@openauthjs/openauth/provider/cognito").then((mod) =>
       mod.CognitoProvider(providerConfig.data),
     ),
-  parser: (data) => {
+  parser: async (data, providerConfig) => {
+    const { domain, region } = providerConfig.data;
+    const info = await OAuth2Fetcher<CognitoUserInfo>(
+      `https://${domain}.auth.${region}.amazoncognito.com/oauth2/userInfo`,
+      data.tokenset.access,
+    );
     return {
-      identifier: data.claims.email || data.claims.sub,
-      data: data.claims,
+      identifier: info.sub || info.email!,
+      data: info,
     };
   },
 };
@@ -600,6 +629,9 @@ const discordBuilder: ConfigType<
     const info = await OAuth2Fetcher<DiscordUserInfo>(
       "https://discord.com/api/users/@me",
       data.tokenset.access,
+      {
+        Accept: "application/json",
+      },
     );
     return {
       identifier: info.id,
@@ -639,6 +671,9 @@ const facebookBuilder: ConfigType<
     const info = await OAuth2Fetcher<FacebookUserInfo>(
       "https://graph.facebook.com/me?fields=id,name,email,picture",
       data.tokenset.access,
+      {
+        Accept: "application/json",
+      },
     );
     return {
       identifier: info.id,
@@ -676,6 +711,10 @@ const githubBuilder: ConfigType<
     const info = await OAuth2Fetcher<GitHubUserInfo>(
       "https://api.github.com/user",
       data.tokenset.access,
+      {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
     );
     return {
       identifier: String(info.id),
@@ -689,18 +728,7 @@ const githubBuilder: ConfigType<
 export type GoogleData = {
   provider: "google";
   clientID: string;
-  tokenset: {
-    access: string;
-    refresh: any;
-    expiry: number;
-    raw: {
-      access_token: string;
-      expires_in: number;
-      token_type: string;
-      id_token: string;
-      scope: string;
-    };
-  };
+  tokenset: TokenSet;
 };
 
 export type GoogleUserInfo = {
@@ -726,6 +754,10 @@ const googleBuilder: ConfigType<
     const info = await OAuth2Fetcher<GoogleUserInfo>(
       "https://www.googleapis.com/oauth2/v3/userinfo",
       data.tokenset.access,
+      {
+        Accept: "application/json",
+        "User-Agent": "OpenAuthSter Issuer",
+      },
     );
 
     return {
@@ -776,19 +808,35 @@ const jumpcloudBuilder: ConfigType<
 
 // Keycloak Provider /////////////////////////////
 
+export type KeycloakUserInfo = {
+  sub: string;
+  email?: string;
+  email_verified?: boolean;
+  preferred_username?: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  [key: string]: unknown;
+};
+
 const keycloakBuilder: ConfigType<
   KeycloakProviderConfig,
-  { claims: Record<string, any> },
-  Record<string, any>
+  { tokenset: TokenSet; clientID: string },
+  KeycloakUserInfo
 > = {
   provider: ({ providerConfig }) =>
     import("@openauthjs/openauth/provider/keycloak").then((mod) =>
       mod.KeycloakProvider(providerConfig.data),
     ),
-  parser: (data) => {
+  parser: async (data, providerConfig) => {
+    const { baseUrl, realm } = providerConfig.data;
+    const info = await OAuth2Fetcher<KeycloakUserInfo>(
+      `${baseUrl}/realms/${realm}/protocol/openid-connect/userinfo`,
+      data.tokenset.access,
+    );
     return {
-      identifier: data.claims.email || data.claims.sub,
-      data: data.claims,
+      identifier: info.sub || info.email!,
+      data: info,
     };
   },
 };
@@ -820,6 +868,9 @@ const microsoftBuilder: ConfigType<
     const info = await OAuth2Fetcher<MicrosoftUserInfo>(
       "https://graph.microsoft.com/v1.0/me",
       data.tokenset.access,
+      {
+        Accept: "application/json",
+      },
     );
     return {
       identifier: info.id,
@@ -834,7 +885,7 @@ const microsoftBuilder: ConfigType<
 
 const oauth2Builder: ConfigType<
   GenericOAuthProviderConfig,
-  { clientID: string; tokenSet: TokenSet },
+  { clientID: string; tokenset: TokenSet },
   Record<string, any>
 > = {
   provider: ({ providerConfig }) =>
@@ -849,7 +900,7 @@ const oauth2Builder: ConfigType<
       {
         method: providerConfig.data.userInfoGetter.method,
         headers: {
-          Authorization: `Bearer ${data.tokenSet.access}`,
+          Authorization: `Bearer ${data.tokenset.access}`,
           ...providerConfig.data.userInfoGetter.headers,
         },
       },
@@ -914,6 +965,9 @@ const spotifyBuilder: ConfigType<
     const info = await OAuth2Fetcher<SpotifyUserInfo>(
       "https://api.spotify.com/v1/me",
       data.tokenset.access,
+      {
+        Accept: "application/json",
+      },
     );
     return {
       identifier: info.id,
@@ -953,7 +1007,10 @@ const twitchBuilder: ConfigType<
     const info = await OAuth2Fetcher<TwitchUserInfo>(
       "https://api.twitch.tv/helix/users",
       data.tokenset.access,
-      { "Client-Id": data.clientID },
+      {
+        "Client-Id": data.clientID,
+        Accept: "application/json",
+      },
     );
     const user = info.data[0];
     return {
@@ -991,6 +1048,9 @@ const yahooBuilder: ConfigType<
     const info = await OAuth2Fetcher<YahooUserInfo>(
       "https://api.login.yahoo.com/openid/v1/userinfo",
       data.tokenset.access,
+      {
+        Accept: "application/json",
+      },
     );
     return {
       identifier: info.sub,
