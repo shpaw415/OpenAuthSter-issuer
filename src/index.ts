@@ -26,6 +26,8 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
           stack: error.stack,
           request: { headers: Object.fromEntries(request.headers.entries()) },
           response: { status: error.status },
+          token: error.token || null,
+          secret: error.secret || null,
         },
       });
 
