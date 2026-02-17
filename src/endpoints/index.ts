@@ -778,6 +778,41 @@ endpoints.all("*", async (c) => {
       database: c.env.AUTH_DB,
       table: params.clientID!,
     }),
+    allow: async (input, req) => {
+      const incomingUrl = new URL(input.redirectURI);
+
+      // Only allow http and https protocols to prevent protocol-based attacks
+      if (!["http:", "https:"].includes(incomingUrl.protocol)) {
+        return false;
+      }
+
+      // Handle localhost/127.0.0.1 with stricter validation
+      if (
+        incomingUrl.hostname === "localhost" ||
+        incomingUrl.hostname === "127.0.0.1"
+      ) {
+        // Only allow http for localhost (https typically not configured locally)
+        if (incomingUrl.protocol !== "http:") return false;
+        return true;
+      }
+
+      if (!project.originURL) return false;
+
+      const projectUrl = new URL(project.originURL);
+
+      // Enforce HTTPS when project URL uses HTTPS (prevent downgrade attacks)
+      if (
+        projectUrl.protocol === "https:" &&
+        incomingUrl.protocol !== "https:"
+      ) {
+        return false;
+      }
+
+      // Validate origin match
+      if (incomingUrl.origin === projectUrl.origin) return true;
+
+      return false;
+    },
     subjects,
     providers: await generateProvidersFromConfig({
       project: project!,
