@@ -10,16 +10,22 @@
       "database_name": "<YOUR_D1_DATABASE_NAME>",
       "database_id": "<YOUR_D1_DATABASE_ID>",
       "migrations_dir": "drizzle/migrations",
-      "remote": true
-    }
+      "remote": true,
+    },
   ],
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    // Comma-separated list of admin emails for the WebUI.
     "WEBUI_ADMIN_EMAILS": "email1@example.com,email2@example.com",
+    // The origin URL of your WebUI, used for CORS and redirects.
     "WEBUI_ORIGIN_URL": "https://your-webui-domain.com",
-    "ISSUER_URL": "https://your-issuer-domain.com"
-  }
+    // The URL of your OpenAuthster.
+    "ISSUER_URL": "https://your-issuer-domain.com",
+    // Enable or disable verbose logging (set to "true" to enable).
+    // Enable in development or when troubleshooting, but disable in production for better performance.
+    "LOG_ENABLED": "false",
+  },
 }

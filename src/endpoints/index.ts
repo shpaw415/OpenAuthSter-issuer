@@ -1093,11 +1093,10 @@ function createSelfClient({
 }) {
   return createClient({
     clientID,
-    issuer: env.ISSUER_URL,
+    issuer: env.ISSUER_URL || "http://proxy.localhost",
     async fetch(input, init) {
       const url = new URL(input);
       url.searchParams.append("client_id", clientID);
-
       return Issuer.fetch(new Request(url.toString(), init), env, ctx);
     },
   });
