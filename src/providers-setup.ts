@@ -29,6 +29,7 @@ import {
   WebUiCopyTemplateTable,
 } from "openauth-webui-shared-types/database";
 import { JWTPayload } from "jose";
+import { WebHook } from "openauth-webui-shared-types/webhook";
 
 export type userExtractResult<T extends Record<string, any>> = {
   identifier: string;
@@ -275,6 +276,8 @@ function OAuth2Fetcher<UserInfo>(
     .then((res) => res.json() as Promise<UserInfo>);
 }
 
+type ProviderToOutput<ProviderUserInfo> = Omit<ProviderUserInfo, "provider">;
+
 // Password Provider ///////////////////////
 
 const passwordConfigBuilder: ConfigType<
@@ -362,7 +365,7 @@ const oidcConfigBuilder: ConfigType<
     id: JWTPayload;
     clientID: string;
   },
-  Record<string, any>
+  JWTPayload
 > = {
   provider: ({ providerConfig }) =>
     import("@openauthjs/openauth/provider/oidc").then((m) =>
@@ -399,6 +402,14 @@ const codeConfigBuilder: ConfigType<
       copy: copyData,
       mode: project.codeMode,
       sendCode: async (claim, code) => {
+        // Trigger webhooks for code_sent event
+        await new WebHook({ db: env.AUTH_DB }).trigger({
+          clientID: project.clientID,
+          event: "code_sent",
+          secret: project.secret,
+          data: { claim, code },
+        });
+
         console.log({ claim, code });
         switch (project.codeMode) {
           case "email":
@@ -420,6 +431,7 @@ const codeConfigBuilder: ConfigType<
             if (!claim.phone) {
               throw new Error("No phone number provided for code delivery.");
             }
+
             await sendCodeWithSMS({
               code,
               to: claim.phone! as string,

@@ -36,6 +36,13 @@
       "when": 1770829046410,
       "tag": "0004_wild_zuras",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1771532635816,
+      "tag": "0005_cheerful_namor",
+      "breakpoints": true
     }
   ]
 }

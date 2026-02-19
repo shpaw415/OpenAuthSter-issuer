@@ -53,6 +53,8 @@ import { ensureInviteLinkIsValid, removeInviteLinkById } from "../invite-link";
 
 import { parse } from "valibot";
 import { deleteCache, getCache, setCache } from "../cache";
+import { WebHook } from "openauth-webui-shared-types/webhook";
+import { cors } from "hono/cors";
 
 class PartialRequestError extends Error {
   status: ContentfulStatusCode;
@@ -852,7 +854,6 @@ endpoints.all("*", async (c) => {
         params,
         ctx: c,
       });
-
       return ctx.subject("user", {
         id: userData.id,
         data: userData.data,
@@ -883,6 +884,9 @@ async function getProjectById(
 ): Promise<null | Project> {
   if (clientId === PUBLIC_CLIENT_ID) {
     return {
+      themeId: null,
+      emailTemplateId: null,
+      projectData: undefined as any,
       active: true,
       clientID: PUBLIC_CLIENT_ID,
       created_at: new Date().toISOString(),
@@ -971,10 +975,9 @@ async function getOrCreateUser({
     value.provider as keyof typeof providerConfigMap
   ].parser(value, providerConfig);
 
-  if (
-    project.registerOnInvite &&
-    !(await userExists(env, userData.identifier, project.clientID))
-  ) {
+  const exists = await userExists(env, userData.identifier, project.clientID);
+
+  if (project.registerOnInvite && !exists) {
     if (!params.inviteID)
       throw new Error("Invite ID is required for registration on invite");
     await ensureInviteLinkIsValid(params.inviteID, env).catch((error) => {
@@ -995,6 +998,28 @@ async function getOrCreateUser({
       });
     });
   }
+
+  const res = (
+    await new WebHook({ db: ctx.env.AUTH_DB }).trigger({
+      clientID: params.clientID!,
+      event: exists ? "login_success" : "registration_success",
+      secret: project.secret,
+      data: { identifier: userData.identifier, provider: value.provider },
+    })
+  ).filter((res) => !res.success);
+
+  if (res.length > 0)
+    await insertLog({
+      clientID: params.clientID!,
+      type: "warning",
+      message: `One or more webhooks failed to trigger for ${
+        exists ? "login" : "registration"
+      } of user with identifier ${userData.identifier}. Failed webhooks: ${res
+        .map((r) => r.id)
+        .join(", ")}`,
+      database: env.AUTH_DB,
+      endpoint: `${exists ? "login" : "registration"} flow`,
+    });
 
   const dataToStore = { ...userData.data, provider: value.provider };
   const result = (
