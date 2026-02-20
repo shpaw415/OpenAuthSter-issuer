@@ -8,7 +8,9 @@ export interface InitFlowOptions {
   repo?: string;
 }
 
-export interface InitFlowDeps {
+export interface InitFlowDeps<
+  T extends Record<string, string> = Record<string, string>,
+> {
   exec: ExecFn;
   checkBinary: (binary: string) => Promise<boolean>;
   readFile: (path: string) => Promise<string>;
@@ -16,7 +18,7 @@ export interface InitFlowDeps {
   parseJSONC: (content: string) => Record<string, unknown>;
   /** Prompt the user to fill in each var. Receives the vars from the example
    * config (key → placeholder) and returns the user-supplied values. */
-  promptVars: (vars: Record<string, string>) => Promise<Record<string, string>>;
+  promptVars: (vars: T) => Promise<Record<keyof T, string>>;
   exit: (code: number) => void;
   log: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
@@ -137,8 +139,28 @@ export async function initializeFlow(
   if (createDBResult.stderr) {
     console.log({ createDBResult });
     error("Error creating D1 database:", createDBResult.stderr);
-    exit(1);
-    return;
+    if (
+      createDBResult.stderr.includes("database with that name already exists")
+    ) {
+      const res = await promptVars({
+        "the database already exists. Do you want to continue? (yes/no)": "no",
+      });
+      const acceptedValues = ["yes", "y", "true"];
+      if (
+        !acceptedValues.includes(
+          res[
+            "the database already exists. Do you want to continue? (yes/no)"
+          ].toLowerCase(),
+        )
+      ) {
+        log("Exiting initialization.");
+        exit(0);
+        return;
+      }
+    } else {
+      exit(1);
+      return;
+    }
   }
 
   log("D1 database created successfully!");
