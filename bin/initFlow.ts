@@ -76,10 +76,7 @@ export async function initializeFlow(
     }
 
     const gitInitResult = await exec(`git init`);
-    if (
-      gitInitResult.stderr &&
-      !gitInitResult.stderr.includes("remote cloudflare already exists")
-    ) {
+    if (gitInitResult.stderr) {
       error("Error initializing git repository:", gitInitResult.stderr);
       exit(1);
       return;
@@ -88,14 +85,20 @@ export async function initializeFlow(
     const gitCreateResult = await exec(
       `git remote add cloudflare ${options.repo}`,
     );
-    if (gitCreateResult.stderr) {
+    if (
+      gitCreateResult.stderr &&
+      !gitCreateResult.stderr.includes("remote cloudflare already exists")
+    ) {
       error("Error initializing git repository:", gitCreateResult.stderr);
       exit(1);
       return;
     }
 
     const gitPushResult = await exec(`git push --set-upstream cloudflare main`);
-    if (gitPushResult.stderr) {
+    if (
+      gitPushResult.stderr &&
+      !gitPushResult.stderr.includes("Everything up-to-date")
+    ) {
       console.log({ gitPushResult });
       error("Error setting upstream and pushing to git:", gitPushResult.stderr);
       exit(1);
