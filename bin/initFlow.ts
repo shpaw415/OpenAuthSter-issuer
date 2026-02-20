@@ -1,3 +1,5 @@
+import { bunFileSystemModule } from "hono/bun";
+
 export type ExecResult = { stdout: string; stderr: string };
 export type ExecFn = (cmd: string) => Promise<ExecResult>;
 
@@ -157,6 +159,10 @@ export async function initializeFlow(
         exit(0);
         return;
       }
+      console.log(
+        `\x1b[31m ${"-".repeat(10)}\n\n > YOU MUST ENTER MANUALY YOUR DATABASE CREDENTIALS INTO THE VARS IN wrangler.json BEFORE DEPLOYING \n\n${"-".repeat(10)}\x1b[0m`,
+      );
+      Bun.sleepSync(3000);
     } else {
       exit(1);
       return;
