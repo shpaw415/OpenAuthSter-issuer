@@ -127,11 +127,10 @@ endpoints.get("/health", (c) => {
  * OpenAuthster version endpoint
  */
 endpoints.get("/version", async (c) => {
-  cors({
-    origin: "*",
-    allowMethods: ["GET"],
+  return c.text(packageJson.version, 200, {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET",
   });
-  return c.text(packageJson.version, 200);
 });
 
 /**
