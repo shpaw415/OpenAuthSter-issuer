@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { version } from "../package.json";
 import { exec } from "child_process";
+import { createInterface } from "readline";
 import { promisify } from "util";
 import { initializeFlow } from "./initFlow";
 import { upgradeFlow } from "./upgradeFlow";
@@ -74,6 +75,22 @@ program
         writeFile: (path, content) => Bun.write(path, content).then(() => {}),
         parseJSONC: (content) =>
           Bun.JSONC.parse(content) as Record<string, unknown>,
+        promptVars: async (vars) => {
+          const rl = createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+          const result: Record<string, string> = {};
+          for (const [key, placeholder] of Object.entries(vars)) {
+            result[key] = await new Promise((resolve) => {
+              rl.question(`  ${key} [${placeholder}]: `, (answer) =>
+                resolve(answer.trim() || placeholder),
+              );
+            });
+          }
+          rl.close();
+          return result;
+        },
         exit: (code) => process.exit(code),
         log: console.log,
         error: console.error,

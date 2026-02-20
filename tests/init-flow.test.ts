@@ -21,6 +21,12 @@ const fail = (msg: string): ExecResult => ({ stdout: "", stderr: msg });
 const EXAMPLE_CONFIG = JSON.stringify({
   name: "openauthster-issuer",
   d1_databases: [],
+  vars: {
+    WEBUI_ADMIN_EMAILS: "email1@example.com,email2@example.com",
+    WEBUI_ORIGIN_URL: "https://your-webui-domain.com",
+    ISSUER_URL: "https://your-issuer-domain.com",
+    LOG_ENABLED: "false",
+  },
 });
 
 /** Build a deps object where every exec command succeeds by default. */
@@ -52,6 +58,8 @@ function makeDeps(
       written[path] = content;
     },
     parseJSONC: (content) => JSON.parse(content),
+    // Default: return placeholder values unchanged (simulates user pressing Enter)
+    promptVars: async (vars) => ({ ...vars }),
     exit: (code) => {
       exitCodes.push(code);
     },
@@ -384,6 +392,109 @@ describe("initializeFlow – jurisdiction and location forwarding", () => {
   );
 });
 
+// ─── promptVars ──────────────────────────────────────────────────────────────
+
+describe("initializeFlow – promptVars", () => {
+  const options: InitFlowOptions = {
+    method: "wrangler",
+    jurisdiction: "eu",
+    location: "enam",
+  };
+
+  it("calls promptVars with the vars from the example config", async () => {
+    let received: Record<string, string> | undefined;
+    const { deps } = makeDeps({
+      promptVars: async (vars) => {
+        received = vars;
+        return vars;
+      },
+    });
+    await initializeFlow(options, deps);
+
+    expect(received).toEqual({
+      WEBUI_ADMIN_EMAILS: "email1@example.com,email2@example.com",
+      WEBUI_ORIGIN_URL: "https://your-webui-domain.com",
+      ISSUER_URL: "https://your-issuer-domain.com",
+      LOG_ENABLED: "false",
+    });
+  });
+
+  it("writes user-supplied values into wrangler.json vars", async () => {
+    const userValues = {
+      WEBUI_ADMIN_EMAILS: "admin@mycompany.com",
+      WEBUI_ORIGIN_URL: "https://admin.mycompany.com",
+      ISSUER_URL: "https://auth.mycompany.com",
+      LOG_ENABLED: "true",
+    };
+    const { deps, written } = makeDeps({
+      promptVars: async () => userValues,
+    });
+    await initializeFlow(options, deps);
+
+    const wranglerJson = JSON.parse(written["./wrangler.json"]);
+    expect(wranglerJson.vars).toEqual(userValues);
+  });
+
+  it("writes placeholder values when the user accepts defaults (returns vars unchanged)", async () => {
+    const { deps, written } = makeDeps();
+    await initializeFlow(options, deps);
+
+    const wranglerJson = JSON.parse(written["./wrangler.json"]);
+    expect(wranglerJson.vars).toEqual({
+      WEBUI_ADMIN_EMAILS: "email1@example.com,email2@example.com",
+      WEBUI_ORIGIN_URL: "https://your-webui-domain.com",
+      ISSUER_URL: "https://your-issuer-domain.com",
+      LOG_ENABLED: "false",
+    });
+  });
+
+  it("writes partially overridden vars when user fills only some fields", async () => {
+    const { deps, written } = makeDeps({
+      promptVars: async (vars) => ({
+        ...vars,
+        ISSUER_URL: "https://auth.mycompany.com",
+        WEBUI_ORIGIN_URL: "https://admin.mycompany.com",
+      }),
+    });
+    await initializeFlow(options, deps);
+
+    const wranglerJson = JSON.parse(written["./wrangler.json"]);
+    expect(wranglerJson.vars.ISSUER_URL).toBe("https://auth.mycompany.com");
+    expect(wranglerJson.vars.WEBUI_ORIGIN_URL).toBe(
+      "https://admin.mycompany.com",
+    );
+    // un-touched keys keep their placeholder
+    expect(wranglerJson.vars.WEBUI_ADMIN_EMAILS).toBe(
+      "email1@example.com,email2@example.com",
+    );
+    expect(wranglerJson.vars.LOG_ENABLED).toBe("false");
+  });
+
+  it("logs the prompt header before calling promptVars", async () => {
+    const promptOrder: string[] = [];
+    const { deps, logs } = makeDeps({
+      promptVars: async (vars) => {
+        promptOrder.push("prompt");
+        return vars;
+      },
+    });
+    // Capture log calls in order
+    const logOrder: string[] = [];
+    deps.log = (...args) => {
+      const msg = args.join(" ");
+      logs.push(msg);
+      logOrder.push(msg);
+    };
+
+    await initializeFlow(options, deps);
+
+    const headerIdx = logOrder.findIndex((l) =>
+      l.includes("Please provide your environment configuration"),
+    );
+    expect(headerIdx).toBeGreaterThanOrEqual(0);
+  });
+});
+
 // ─── integration: clone + wrangler initialize ────────────────────────────────
 
 describe("initializeFlow – integration (real clone, mocked external commands)", () => {
@@ -418,6 +529,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       },
       parseJSONC: (content) =>
         Bun.JSONC.parse(content) as Record<string, unknown>,
+      promptVars: async (vars) => vars,
       exit: (code) => {
         throw new Error(`process.exit(${code}) called unexpectedly`);
       },
@@ -460,6 +572,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       },
       parseJSONC: (content) =>
         Bun.JSONC.parse(content) as Record<string, unknown>,
+      promptVars: async (vars) => vars,
       exit: (code) => {
         throw new Error(`process.exit(${code}) called unexpectedly`);
       },
@@ -498,6 +611,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       },
       parseJSONC: (content) =>
         Bun.JSONC.parse(content) as Record<string, unknown>,
+      promptVars: async (vars) => vars,
       exit: (code) => {
         throw new Error(`process.exit(${code}) called unexpectedly`);
       },

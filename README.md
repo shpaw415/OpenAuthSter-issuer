@@ -12,6 +12,9 @@ OpenAuthster Issuer is the core authentication server that powers the OpenAuthst
 - 📧 **Email Authentication** - Built-in email/password and magic link support
 - 🔗 **OAuth Providers** - Configurable social login providers (Google, GitHub, etc.)
 - 🎨 **Themeable** - Customizable authentication UI per project
+- 🪝 **Webhooks** - Real-time event notifications for auth, session, and user management events
+- 🌐 **CORS Support** - Comprehensive cross-origin resource sharing policy for WebUI integration
+- 🛠️ **CLI** - Built-in `initialize` and `upgrade` commands for zero-friction deployment
 
 ## Prerequisites
 
@@ -26,6 +29,27 @@ bun add -g wrangler
 # Or with npm
 npm install -g wrangler
 ```
+
+## Quick Start (CLI)
+
+The fastest way to get up and running is via the built-in CLI:
+
+```bash
+# Clone the repository
+git clone https://github.com/shpaw415/OpenAuthSter-issuer.git openauth-issuer
+cd openauth-issuer
+bun install
+
+# Initialize with Wrangler (creates D1 database + dry-run deploy)
+bun run cli initialize --method wrangler --jurisdiction eu --location eeur
+
+# Or initialize with Git CI/CD
+bun run cli initialize --method git --jurisdiction eu --location eeur --repo https://github.com/YOUR_USERNAME/YOUR_PRIVATE_REPO.git
+```
+
+See [CLI Commands](#cli-commands) for full reference.
+
+---
 
 ## Installation
 
@@ -216,17 +240,57 @@ Requires authentication with Bearer token via `Authorization` header.
 ### Utility Endpoints
 
 - **GET** `/health` - Health check
-- **GET** `/version` - Get OpenAuthster issuer version
+- **GET** `/version` - Get OpenAuthster issuer version with cors \* access
 - **GET** `/cleanup` - Clear authentication cookies (testing)
 
 ### Authentication Endpoints
 
 All OpenAuth standard endpoints are available at `/*` for OAuth flows.
 
+## CLI Commands
+
+The CLI is available via `bun run cli <command>`.
+
+### `initialize`
+
+Initializes a fresh deployment: generates `wrangler.json`, creates the D1 database, applies migrations, and optionally deploys.
+
+```
+bun run cli initialize [options]
+
+Options:
+  -m, --method <method>          wrangler | git  (required)
+  -j, --jurisdiction <value>     eu | fedramp    (default: eu)
+  -l, --location <value>         weur | eeur | apac | oc | wnam | enam  (default: enam)
+  -r, --repo <url>               Git repository URL (required for --method git)
+```
+
+**Wrangler method** — creates the D1 database remotely, applies migrations, runs `wrangler deploy --dry-run`.
+
+**Git method** — additionally sets up the git remote, commits initial code, and pushes to trigger a CI/CD deployment.
+
+### `upgrade`
+
+Upgrades an existing deployment to a newer version: pulls the latest code, applies any new migrations, and optionally redeploys.
+
+```
+bun run cli upgrade [options]
+
+Options:
+  -v, --version <version>   Branch or tag to upgrade to  (default: latest → main)
+  -d, --deploy <method>     none | wrangler | git         (default: none)
+```
+
+---
+
 ## Project Structure
 
 ```
 openauth-multitenant-server/  # (GitHub: OpenAuthSter-issuer)
+├── bin/
+│   ├── index.ts              # CLI entry point (commander)
+│   ├── initFlow.ts           # initialize command logic (dependency-injected)
+│   └── upgradeFlow.ts        # upgrade command logic (dependency-injected)
 ├── src/
 │   ├── index.ts              # Worker entry point
 │   ├── providers-setup.ts    # OAuth provider configuration
@@ -236,6 +300,9 @@ openauth-multitenant-server/  # (GitHub: OpenAuthSter-issuer)
 │   ├── defaults/             # Default themes and email templates
 │   └── endpoints/
 │       └── index.ts          # API endpoints (Hono-based)
+├── tests/
+│   ├── init-flow.test.ts     # Unit + integration tests for initialize command
+│   └── upgrade-flow.test.ts  # Unit tests for upgrade command
 ├── drizzle/                  # Database migrations
 ├── openauth.config.ts        # OpenAuth configuration
 └── wrangler.json             # Cloudflare Worker configuration

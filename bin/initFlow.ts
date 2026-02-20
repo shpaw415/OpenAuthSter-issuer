@@ -14,6 +14,9 @@ export interface InitFlowDeps {
   readFile: (path: string) => Promise<string>;
   writeFile: (path: string, content: string) => Promise<void>;
   parseJSONC: (content: string) => Record<string, unknown>;
+  /** Prompt the user to fill in each var. Receives the vars from the example
+   * config (key → placeholder) and returns the user-supplied values. */
+  promptVars: (vars: Record<string, string>) => Promise<Record<string, string>>;
   exit: (code: number) => void;
   log: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
@@ -31,6 +34,7 @@ export async function initializeFlow(
     readFile,
     writeFile,
     parseJSONC,
+    promptVars,
     exit,
     log,
     error,
@@ -97,6 +101,14 @@ export async function initializeFlow(
   >;
 
   wranglerConfig.d1_databases = [];
+
+  // Prompt the user to fill in environment-specific vars
+  const exampleVars = (wranglerConfig.vars ?? {}) as Record<string, string>;
+  log(
+    "\nPlease provide your environment configuration (press Enter to keep the placeholder):",
+  );
+  const filledVars = await promptVars(exampleVars);
+  wranglerConfig.vars = filledVars;
 
   await writeFile("./wrangler.json", JSON.stringify(wranglerConfig, null, 2));
   log("wrangler.json configuration generated successfully!");
