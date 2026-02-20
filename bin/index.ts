@@ -8,7 +8,7 @@ import { upgradeFlow } from "./upgradeFlow";
 const execSync = async (
   command: string,
 ): Promise<{ stdout: string; stderr: string }> => {
-  const res = Bun.spawnSync(command.split(" "));
+  const res = Bun.spawnSync([command]);
   return { stdout: res.stdout.toString(), stderr: res.stderr.toString() };
 };
 
