@@ -97,7 +97,8 @@ export async function initializeFlow(
     const gitPushResult = await exec(`git push --set-upstream cloudflare main`);
     if (
       gitPushResult.stderr &&
-      !gitPushResult.stderr.includes("Everything up-to-date")
+      !gitPushResult.stderr.includes("Everything up-to-date") &&
+      !gitPushResult.stderr.endsWith("main -> main\n")
     ) {
       console.log({ gitPushResult });
       error("Error setting upstream and pushing to git:", gitPushResult.stderr);
