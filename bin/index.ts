@@ -2,11 +2,15 @@ import { Command } from "commander";
 import { version } from "../package.json";
 import { exec } from "child_process";
 import { createInterface } from "readline";
-import { promisify } from "util";
 import { initializeFlow } from "./initFlow";
 import { upgradeFlow } from "./upgradeFlow";
 
-const execSync = promisify(exec);
+const execSync = async (
+  command: string,
+): Promise<{ stdout: string; stderr: string }> => {
+  const res = Bun.spawnSync(command.split(" "));
+  return { stdout: res.stdout.toString(), stderr: res.stderr.toString() };
+};
 
 const program = new Command();
 
