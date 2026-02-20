@@ -78,7 +78,7 @@ export async function initializeFlow(
     const gitInitResult = await exec(`git init`);
     if (
       gitInitResult.stderr &&
-      !gitInitResult.stderr.includes("Reinitialized existing Git repository")
+      !gitInitResult.stderr.includes("remote cloudflare already exists")
     ) {
       error("Error initializing git repository:", gitInitResult.stderr);
       exit(1);
