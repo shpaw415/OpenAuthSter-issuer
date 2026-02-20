@@ -28,6 +28,12 @@ program
 
     const execSync = promisify(exec);
 
+    await ensureGitExists();
+
+    console.log(
+      `Upgrading to version: ${targetVersion} with deploy method: ${deployMethod}...`,
+    );
+
     const gitResult = await execSync(
       `git pull --rebase --no-edit origin ${targetVersion}`,
     );
