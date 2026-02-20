@@ -75,13 +75,20 @@ export async function initializeFlow(
       return;
     }
 
-    const gitCreateResult = await exec(
-      `git init && git remote add cloudflare ${options.repo}`,
-    );
+    const gitInitResult = await exec(`git init`);
     if (
-      gitCreateResult.stderr &&
-      !gitCreateResult.stderr.includes("remote cloudflare already exists")
+      gitInitResult.stderr &&
+      !gitInitResult.stderr.includes("Reinitialized existing Git repository")
     ) {
+      error("Error initializing git repository:", gitInitResult.stderr);
+      exit(1);
+      return;
+    }
+
+    const gitCreateResult = await exec(
+      `git remote add cloudflare ${options.repo}`,
+    );
+    if (gitCreateResult.stderr) {
       error("Error initializing git repository:", gitCreateResult.stderr);
       exit(1);
       return;
