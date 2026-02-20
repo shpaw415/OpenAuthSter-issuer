@@ -135,6 +135,7 @@ export async function initializeFlow(
     `wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction ${options.jurisdiction} --location ${options.location}`,
   );
   if (createDBResult.stderr) {
+    console.log({ createDBResult });
     error("Error creating D1 database:", createDBResult.stderr);
     exit(1);
     return;
@@ -142,7 +143,7 @@ export async function initializeFlow(
 
   log("D1 database created successfully!");
 
-  const dbResult = await exec(`wrangler d1 apply AUTH_DB`);
+  const dbResult = await exec(`wrangler d1 migrations apply AUTH_DB`);
   if (dbResult.stderr) {
     error("Error applying database schema:", dbResult.stderr);
     exit(1);
