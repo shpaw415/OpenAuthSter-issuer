@@ -76,7 +76,7 @@ export async function initializeFlow(
     }
 
     const gitCreateResult = await exec(
-      `git init && git remote add cloudflare ${options.repo}`,
+      `git init -q && git remote add cloudflare ${options.repo}`,
     );
     if (
       gitCreateResult.stderr &&
