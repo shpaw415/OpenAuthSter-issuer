@@ -85,7 +85,7 @@ describe("initializeFlow – wrangler method", () => {
     await initializeFlow(options, deps);
 
     expect(calls).toEqual([
-      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --remote true --jurisdiction eu --location eeur",
+      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction eu --location eeur",
       "wrangler d1 apply AUTH_DB",
       "wrangler deploy --dry-run",
     ]);
@@ -146,9 +146,10 @@ describe("initializeFlow – git method", () => {
     await initializeFlow(options, deps);
 
     expect(calls).toEqual([
-      "git init && git remote add cloudflare https://github.com/example/repo.git",
+      "git init",
+      "git remote add cloudflare https://github.com/example/repo.git",
       "git push --set-upstream cloudflare main",
-      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --remote true --jurisdiction fedramp --location wnam",
+      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction fedramp --location wnam",
       "wrangler d1 apply AUTH_DB",
       "git remote set-url --push cloudflare https://github.com/example/repo.git",
       `git add . && git commit -m "Initial commit" && git push cloudflare main`,
@@ -272,8 +273,7 @@ describe("initializeFlow – exec error handling", () => {
     const { deps, exitCodes, errors } = makeDeps(
       {},
       {
-        "git init && git remote add cloudflare https://example.com/repo.git":
-          fail("not a git repo"),
+        "git init": fail("not a git repo"),
       },
     );
     await initializeFlow(gitOptions, deps);
@@ -284,20 +284,23 @@ describe("initializeFlow – exec error handling", () => {
     ).toBe(true);
   });
 
-  it("exits on git push upstream failure", async () => {
+  it("logs error but continues when git push upstream fails (non-fatal)", async () => {
     const { deps, exitCodes, errors } = makeDeps(
       {},
       { "git push --set-upstream cloudflare main": fail("rejected") },
     );
     await initializeFlow(gitOptions, deps);
 
-    expect(exitCodes).toEqual([1]);
-    expect(errors.some((e) => e.includes("Error setting upstream"))).toBe(true);
+    // non-fatal: flow continues, no exit
+    expect(exitCodes).toEqual([]);
+    expect(
+      errors.some((e) => e.includes("Error setting upstream")),
+    ).toBe(true);
   });
 
   it("exits on D1 create failure", async () => {
     const cmd =
-      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --remote true --jurisdiction eu --location enam";
+      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction eu --location enam";
     const { deps, exitCodes, errors } = makeDeps(
       {},
       { [cmd]: fail("unauthorized") },
@@ -588,7 +591,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
     );
 
     expect(calls).toEqual([
-      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --remote true --jurisdiction eu --location eeur",
+      "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction eu --location eeur",
       "wrangler d1 apply AUTH_DB",
       "wrangler deploy --dry-run",
     ]);
@@ -627,9 +630,10 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
     );
 
     expect(calls).toEqual([
-      `git init && git remote add cloudflare ${REPO}`,
+      "git init",
+      `git remote add cloudflare ${REPO}`,
       "git push --set-upstream cloudflare main",
-      `wrangler d1 create openauthster --binding AUTH_DB --update-config true --remote true --jurisdiction fedramp --location wnam`,
+      `wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction fedramp --location wnam`,
       "wrangler d1 apply AUTH_DB",
       `git remote set-url --push cloudflare ${REPO}`,
       `git add . && git commit -m "Initial commit" && git push cloudflare main`,

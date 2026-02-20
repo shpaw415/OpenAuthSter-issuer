@@ -89,9 +89,11 @@ export async function initializeFlow(
       gitCreateResult.stderr &&
       !gitCreateResult.stderr.includes("remote cloudflare already exists")
     ) {
+      console.log({ gitCreateResult });
       error("Error initializing git repository:", gitCreateResult.stderr);
-      exit(1);
-      return;
+      console.log(
+        "error has occured you may continue but may encounter issues",
+      );
     }
 
     const gitPushResult = await exec(`git push --set-upstream cloudflare main`);
@@ -102,8 +104,9 @@ export async function initializeFlow(
     ) {
       console.log({ gitPushResult });
       error("Error setting upstream and pushing to git:", gitPushResult.stderr);
-      exit(1);
-      return;
+      console.log(
+        "error has occured you may continue but may encounter issues",
+      );
     }
   }
 
@@ -129,7 +132,7 @@ export async function initializeFlow(
   log("wrangler.json configuration generated successfully!");
 
   const createDBResult = await exec(
-    `wrangler d1 create openauthster --binding AUTH_DB --update-config true --remote true --jurisdiction ${options.jurisdiction} --location ${options.location}`,
+    `wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction ${options.jurisdiction} --location ${options.location}`,
   );
   if (createDBResult.stderr) {
     error("Error creating D1 database:", createDBResult.stderr);
