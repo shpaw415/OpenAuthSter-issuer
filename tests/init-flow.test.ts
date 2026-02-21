@@ -337,9 +337,12 @@ describe("initializeFlow – jurisdiction and location forwarding", () => {
     ["eu", "weur"],
     ["fedramp", "apac"],
     ["eu", "oc"],
-  ] as [string, string][])(
+  ] as ["eu" | "fedramp", "weur" | "eeur" | "apac" | "oc" | "wnam" | "enam"][])(
     "jurisdiction=%s location=%s is included in the D1 create command",
-    async (jurisdiction, location) => {
+    async (
+      jurisdiction: "eu" | "fedramp",
+      location: "weur" | "eeur" | "apac" | "oc" | "wnam" | "enam",
+    ) => {
       const { deps, calls } = makeDeps();
       await initializeFlow(deps, {
         method: "wrangler",
@@ -377,8 +380,8 @@ describe("initializeFlow – promptVars", () => {
       WEBUI_ORIGIN_URL: "https://your-webui-domain.com",
       ISSUER_URL: "https://your-issuer-domain.com",
       LOG_ENABLED: "false",
-      "db jurisdiction (e.g. US, EU)": "eu",
-      "db location (e.g. us-east, eu-west)": "enam",
+      "db jurisdiction (e.g. eu, fedramp)": "eu",
+      "db location (e.g. weur, eeur, apac, oc, wnam, enam)": "enam",
       "db name": "openauthster",
       "Initialization method (wrangler/git)": "wrangler",
     });

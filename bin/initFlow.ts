@@ -3,8 +3,8 @@ export type ExecFn = (cmd: string) => Promise<ExecResult>;
 
 export interface InitFlowOptions {
   method: "wrangler" | "git";
-  jurisdiction: string;
-  location: string;
+  jurisdiction: "eu" | "fedramp";
+  location: "weur" | "eeur" | "apac" | "oc" | "wnam" | "enam";
   repo?: string;
 }
 
@@ -162,14 +162,15 @@ export async function initializeFlow(
 
   const dbInfo = await promptVars({
     "db name": "openauthster",
-    "db jurisdiction (e.g. US, EU)": options.jurisdiction ?? "US",
-    "db location (e.g. us-east, eu-west)": options.location ?? "us-east",
+    "db jurisdiction (e.g. eu, fedramp)": options.jurisdiction ?? "eu",
+    "db location (e.g. weur, eeur, apac, oc, wnam, enam)":
+      options.location ?? "weur",
   });
 
   const dbParsedInfo = {
     name: dbInfo["db name"],
-    jurisdiction: dbInfo["db jurisdiction (e.g. US, EU)"],
-    location: dbInfo["db location (e.g. us-east, eu-west)"],
+    jurisdiction: dbInfo["db jurisdiction (e.g. eu, fedramp)"],
+    location: dbInfo["db location (e.g. weur, eeur, apac, oc, wnam, enam)"],
   };
 
   const createDBResult = await exec(
