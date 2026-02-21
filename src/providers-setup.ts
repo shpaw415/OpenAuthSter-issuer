@@ -131,7 +131,7 @@ async function sendCodeWithEmail({
       const result = await new (await import("resend")).Resend(
         apiKey,
       ).emails.send({
-        from: `Acme <${project.projectData?.emailFrom || globalConfig.register.fallbackEmailFrom}>`,
+        from: `${project.projectData.companyName || "Acme"} <${project.projectData?.emailFrom || globalConfig.register.fallbackEmailFrom}>`,
         to: [to],
         subject: emailTemplate.subject || "Your verification code",
         html: mustache.render(emailTemplate.body, {
