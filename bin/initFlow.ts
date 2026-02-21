@@ -269,5 +269,9 @@ export async function initializeFlow(
     }
   }
 
+  const pkgjson = JSON.parse(await readFile("./package.json"));
+  pkgjson.deploy_method = method;
+  await writeFile("./package.json", JSON.stringify(pkgjson, null, 2));
+
   log("Initialization successful!");
 }

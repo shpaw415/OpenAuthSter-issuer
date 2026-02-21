@@ -45,7 +45,11 @@ function makeDeps(
   const logs: string[] = [];
   const errors: string[] = [];
   const exitCodes: number[] = [];
-  const written: Record<string, string> = {};
+  const written: Record<string, string> = {
+    "./package.json": JSON.stringify({
+      version: "0.0.0-test",
+    }),
+  };
 
   const deps: InitFlowDeps = {
     exec: async (cmd) => {
@@ -590,5 +594,21 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       await Bun.file(join(cloneDir, "wrangler.json")).text(),
     );
     expect(written.d1_databases).toBeArrayOfSize(1);
+  });
+});
+
+// ─── Package Json updates ────────────────────────────────────────────────────────────────
+
+describe("initializeFlow – package.json updates", () => {
+  it("writes deploy_method to package.json", async () => {
+    const { deps, written } = makeDeps();
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "enam",
+    });
+
+    const pkgJson = JSON.parse(written["./package.json"]);
+    expect(pkgJson.deploy_method).toBe("wrangler");
   });
 });
