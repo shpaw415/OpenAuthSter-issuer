@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import { createInterface } from "readline";
 import { initializeFlow } from "./initFlow";
 import { upgradeFlow } from "./upgradeFlow";
+import packageJson from "../package.json";
 
 const execSync = async (
   command: string,
@@ -27,14 +28,16 @@ program
     "Specify the version to update to",
     "latest",
   )
-  .option("-d, --deploy <method>", "Deploy using wrangler or git", "none")
   .action(async (options) => {
     const targetVersion =
       options.version === "latest" ? "main" : options.version;
     await upgradeFlow(
       {
         version: targetVersion,
-        deploy: options.deploy as "none" | "wrangler" | "git",
+        deploy:
+          //@ts-ignore
+          (packageJson.deploy_method as "wrangler" | "git" | undefined) ??
+          "wrangler",
       },
       {
         exec: execSync,

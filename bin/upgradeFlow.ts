@@ -4,7 +4,7 @@ export type ExecFn = (cmd: string) => Promise<ExecResult>;
 export interface UpgradeFlowOptions {
   /** Branch / tag to pull. "latest" is resolved to "main" before calling this function. */
   version: string;
-  deploy: "none" | "wrangler" | "git";
+  deploy: "wrangler" | "git" | undefined;
 }
 
 export interface UpgradeFlowDeps {
@@ -41,22 +41,22 @@ export async function upgradeFlow(
     error("Error pulling from git:", gitResult.stderr);
     exit(1);
     return;
+  } else {
+    log("Git pull successful!: ", gitResult.stdout);
   }
 
-  const dbResult = await exec(`wrangler d1 apply AUTH_DB`);
+  const dbResult = await exec(`wrangler d1 migrations apply AUTH_DB`);
   if (dbResult.stderr) {
     error("Error applying database schema:", dbResult.stderr);
     exit(1);
     return;
+  } else {
+    log("Database schema updated successfully!: ", dbResult.stdout);
   }
 
   log("Upgrade successful!");
 
-  if (options.deploy === "none") {
-    log(
-      "now deploy the server using `wrangler deploy` or push to your private github repo to trigger a deployment",
-    );
-  } else if (options.deploy === "wrangler") {
+  if (options.deploy === "wrangler") {
     const deployResult = await exec(`wrangler deploy`);
     if (deployResult.stderr) {
       error("Error deploying with wrangler:", deployResult.stderr);
@@ -65,12 +65,14 @@ export async function upgradeFlow(
     }
     log("Deployment successful!");
   } else if (options.deploy === "git") {
-    const gitPushResult = await exec(`git push`);
+    const gitPushResult = await exec(`git push cloudflare main`);
     if (gitPushResult.stderr) {
       error("Error pushing to git:", gitPushResult.stderr);
       exit(1);
       return;
     }
     log("Git push successful!");
+  } else {
+    log("No deployment method specified, skipping deployment.");
   }
 }

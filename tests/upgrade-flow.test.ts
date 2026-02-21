@@ -46,7 +46,7 @@ function makeDeps(
 // ─── deploy: none ────────────────────────────────────────────────────────────
 
 describe("upgradeFlow – deploy: none", () => {
-  const options: UpgradeFlowOptions = { version: "main", deploy: "none" };
+  const options: UpgradeFlowOptions = { version: "main", deploy: undefined };
 
   it("runs expected exec commands in order", async () => {
     const { deps, calls } = makeDeps();
@@ -54,7 +54,7 @@ describe("upgradeFlow – deploy: none", () => {
 
     expect(calls).toEqual([
       "git pull --rebase --no-edit origin main",
-      "wrangler d1 apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB",
     ]);
   });
 
@@ -80,7 +80,11 @@ describe("upgradeFlow – deploy: none", () => {
     const { deps, logs } = makeDeps();
     await upgradeFlow(options, deps);
 
-    expect(logs.some((l) => l.includes("wrangler deploy"))).toBe(true);
+    expect(
+      logs.some((l) =>
+        l.includes("No deployment method specified, skipping deployment."),
+      ),
+    ).toBe(true);
   });
 
   it("produces no errors and does not exit", async () => {
@@ -103,7 +107,7 @@ describe("upgradeFlow – deploy: wrangler", () => {
 
     expect(calls).toEqual([
       "git pull --rebase --no-edit origin v0.3.0",
-      "wrangler d1 apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB",
       "wrangler deploy",
     ]);
   });
@@ -142,8 +146,8 @@ describe("upgradeFlow – deploy: git", () => {
 
     expect(calls).toEqual([
       "git pull --rebase --no-edit origin main",
-      "wrangler d1 apply AUTH_DB",
-      "git push",
+      "wrangler d1 migrations apply AUTH_DB",
+      "git push cloudflare main",
     ]);
   });
 
@@ -177,7 +181,7 @@ describe("upgradeFlow – version forwarding", () => {
     "version=%s is passed to git pull",
     async (version) => {
       const { deps, calls } = makeDeps();
-      await upgradeFlow({ version, deploy: "none" }, deps);
+      await upgradeFlow({ version, deploy: undefined }, deps);
 
       expect(calls[0]).toBe(`git pull --rebase --no-edit origin ${version}`);
     },
@@ -191,7 +195,7 @@ describe("upgradeFlow – binary checks", () => {
     const { deps, errors, exitCodes } = makeDeps({
       checkBinary: async () => false,
     });
-    await upgradeFlow({ version: "main", deploy: "none" }, deps);
+    await upgradeFlow({ version: "main", deploy: undefined }, deps);
 
     expect(exitCodes).toEqual([1]);
     expect(errors.some((e) => e.includes("Git is not installed"))).toBe(true);
@@ -199,7 +203,7 @@ describe("upgradeFlow – binary checks", () => {
 
   it("does not run any exec commands when git is missing", async () => {
     const { deps, calls } = makeDeps({ checkBinary: async () => false });
-    await upgradeFlow({ version: "main", deploy: "none" }, deps);
+    await upgradeFlow({ version: "main", deploy: undefined }, deps);
 
     expect(calls).toEqual([]);
   });
@@ -213,7 +217,7 @@ describe("upgradeFlow – exec error handling", () => {
       {},
       { "git pull --rebase --no-edit origin main": fail("conflict") },
     );
-    await upgradeFlow({ version: "main", deploy: "none" }, deps);
+    await upgradeFlow({ version: "main", deploy: undefined }, deps);
 
     expect(exitCodes).toEqual([1]);
     expect(errors.some((e) => e.includes("Error pulling from git"))).toBe(true);
@@ -224,7 +228,7 @@ describe("upgradeFlow – exec error handling", () => {
       {},
       { "git pull --rebase --no-edit origin main": fail("conflict") },
     );
-    await upgradeFlow({ version: "main", deploy: "none" }, deps);
+    await upgradeFlow({ version: "main", deploy: undefined }, deps);
 
     expect(calls).toEqual(["git pull --rebase --no-edit origin main"]);
   });
@@ -232,9 +236,9 @@ describe("upgradeFlow – exec error handling", () => {
   it("exits on D1 apply failure", async () => {
     const { deps, exitCodes, errors } = makeDeps(
       {},
-      { "wrangler d1 apply AUTH_DB": fail("migration error") },
+      { "wrangler d1 migrations apply AUTH_DB": fail("migration error") },
     );
-    await upgradeFlow({ version: "main", deploy: "none" }, deps);
+    await upgradeFlow({ version: "main", deploy: undefined }, deps);
 
     expect(exitCodes).toEqual([1]);
     expect(
@@ -245,7 +249,7 @@ describe("upgradeFlow – exec error handling", () => {
   it("does not run deploy step after D1 apply failure", async () => {
     const { deps, calls } = makeDeps(
       {},
-      { "wrangler d1 apply AUTH_DB": fail("migration error") },
+      { "wrangler d1 migrations apply AUTH_DB": fail("migration error") },
     );
     await upgradeFlow({ version: "main", deploy: "wrangler" }, deps);
 
@@ -268,7 +272,7 @@ describe("upgradeFlow – exec error handling", () => {
   it("exits on git push failure", async () => {
     const { deps, exitCodes, errors } = makeDeps(
       {},
-      { "git push": fail("rejected") },
+      { "git push cloudflare main": fail("rejected") },
     );
     await upgradeFlow({ version: "main", deploy: "git" }, deps);
 
