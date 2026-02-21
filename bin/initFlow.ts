@@ -42,6 +42,8 @@ export async function initializeFlow(
     error,
   } = deps;
 
+  await exec("bun i --production");
+
   const wranglerExists = await checkBinary("wrangler");
   if (!wranglerExists) {
     error(

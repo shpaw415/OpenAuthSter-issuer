@@ -1,4 +1,7 @@
 Add in shared type a client helper
 
-- setting data in session
 - update password
+
+Email sending
+
+- remove Acme for the name replace it for the current name of the app/company
