@@ -48,30 +48,10 @@ program
 
 program
   .command("initialize")
-  .requiredOption(
-    "-m, --method <method>",
-    "Initialization method (wrangler or git)",
-  )
-  .requiredOption(
-    "-j, --jurisdiction <jurisdiction>",
-    'Jurisdiction for the server ["eu", "fedramp"]',
-    "eu",
-  )
-  .requiredOption(
-    "-l, --location <location>",
-    "Location for the server \nweur: Western Europe\neeur: Eastern Europe\napac: Asia Pacific\noc: Oceania\nwnam: Western North America\nenam: Eastern North America",
-    "enam",
-  )
   .option("-r, --repo <repo>", "Git repository URL for git initialization")
   .description("Initialize the OpenAuth Multitenant Server")
-  .action(async (options) => {
+  .action(async () => {
     await initializeFlow(
-      {
-        method: options.method as "wrangler" | "git",
-        jurisdiction: options.jurisdiction,
-        location: options.location,
-        repo: options.repo,
-      },
       {
         exec: execSync,
         checkBinary: checkBinaryExists,
@@ -99,6 +79,7 @@ program
         log: console.log,
         error: console.error,
       },
+      {},
     );
   });
 
@@ -108,26 +89,6 @@ function checkBinaryExists(binary: string): Promise<boolean> {
       resolve(!error);
     });
   });
-}
-
-async function ensureWranglerExists() {
-  const exists = await checkBinaryExists("wrangler");
-  if (!exists) {
-    console.error(
-      "Wrangler CLI is not installed. Please install it from https://developers.cloudflare.com/workers/wrangler/install-and-update/",
-    );
-    process.exit(1);
-  }
-}
-
-async function ensureGitExists() {
-  const exists = await checkBinaryExists("git");
-  if (!exists) {
-    console.error(
-      "Git is not installed. Please install it from https://git-scm.com/downloads",
-    );
-    process.exit(1);
-  }
 }
 
 program.parse(process.argv);

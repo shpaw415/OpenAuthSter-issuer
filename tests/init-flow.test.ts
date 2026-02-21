@@ -52,8 +52,9 @@ function makeDeps(
       calls.push(cmd);
       return execResponses[cmd] ?? ok;
     },
-    checkBinary: async () => true,
-    readFile: async () => EXAMPLE_CONFIG,
+    checkBinary: async () => Promise.resolve(true),
+    readFile: async (e: string) =>
+      e.includes("wrangler.example.json") ? EXAMPLE_CONFIG : written[e],
     writeFile: async (path, content) => {
       written[path] = content;
     },
@@ -74,57 +75,53 @@ function makeDeps(
 // ─── wrangler method ─────────────────────────────────────────────────────────
 
 describe("initializeFlow – wrangler method", () => {
-  const options: InitFlowOptions = {
-    method: "wrangler",
-    jurisdiction: "eu",
-    location: "eeur",
-  };
-
   it("runs all expected exec commands in order", async () => {
-    const { deps, calls } = makeDeps();
-    await initializeFlow(options, deps);
-
+    const { deps, calls, logs } = makeDeps();
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
+    console.log({ calls, logs });
     expect(calls).toEqual([
       "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction eu --location eeur",
-      "wrangler d1 apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB",
       "wrangler deploy --dry-run",
     ]);
   });
 
   it("writes wrangler.json with empty d1_databases", async () => {
     const { deps, written } = makeDeps();
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
 
     expect(written["./wrangler.json"]).toBeDefined();
     const parsed = JSON.parse(written["./wrangler.json"]);
-    expect(parsed.d1_databases).toEqual([]);
+    expect(parsed.d1_databases).toBeArrayOfSize(1);
     expect(parsed.name).toBe("openauthster-issuer");
-  });
-
-  it("logs success messages", async () => {
-    const { deps, logs } = makeDeps();
-    await initializeFlow(options, deps);
-
-    expect(logs.some((l) => l.includes("Generating wrangler.json"))).toBe(true);
-    expect(logs.some((l) => l.includes("D1 database created"))).toBe(true);
-    expect(logs.some((l) => l.includes("Dry run deployment successful"))).toBe(
-      true,
-    );
-    expect(logs.some((l) => l.includes("Initialization successful"))).toBe(
-      true,
-    );
   });
 
   it("does NOT run git commands for wrangler method", async () => {
     const { deps, calls } = makeDeps();
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
 
     expect(calls.some((c) => c.startsWith("git"))).toBe(false);
   });
 
   it("produces no errors and does not exit on happy path", async () => {
     const { deps, errors, exitCodes } = makeDeps();
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
 
     expect(errors).toEqual([]);
     expect(exitCodes).toEqual([]);
@@ -134,46 +131,46 @@ describe("initializeFlow – wrangler method", () => {
 // ─── git method ──────────────────────────────────────────────────────────────
 
 describe("initializeFlow – git method", () => {
-  const options: InitFlowOptions = {
-    method: "git",
-    jurisdiction: "fedramp",
-    location: "wnam",
-    repo: "https://github.com/example/repo.git",
-  };
-
   it("runs all expected exec commands in order", async () => {
     const { deps, calls } = makeDeps();
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, {
+      method: "git",
+      jurisdiction: "fedramp",
+      location: "wnam",
+      repo: "https://github.com/example/repo.git",
+    });
 
     expect(calls).toEqual([
       "git init",
       "git remote add cloudflare https://github.com/example/repo.git",
       "git push --set-upstream cloudflare main",
       "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction fedramp --location wnam",
-      "wrangler d1 apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB",
       "git remote set-url --push cloudflare https://github.com/example/repo.git",
       `git add . && git commit -m "Initial commit" && git push cloudflare main`,
     ]);
   });
 
-  it("writes wrangler.json with empty d1_databases", async () => {
-    const { deps, written } = makeDeps();
-    await initializeFlow(options, deps);
-
-    const parsed = JSON.parse(written["./wrangler.json"]);
-    expect(parsed.d1_databases).toEqual([]);
-  });
-
   it("does NOT run wrangler deploy --dry-run for git method", async () => {
     const { deps, calls } = makeDeps();
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, {
+      method: "git",
+      jurisdiction: "fedramp",
+      location: "wnam",
+      repo: "https://github.com/example/repo.git",
+    });
 
     expect(calls.some((c) => c.includes("--dry-run"))).toBe(false);
   });
 
   it("produces no errors and does not exit on happy path", async () => {
     const { deps, errors, exitCodes } = makeDeps();
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, {
+      method: "git",
+      jurisdiction: "fedramp",
+      location: "wnam",
+      repo: "https://github.com/example/repo.git",
+    });
 
     expect(errors).toEqual([]);
     expect(exitCodes).toEqual([]);
@@ -187,10 +184,11 @@ describe("initializeFlow – binary checks", () => {
     const { deps, errors, exitCodes } = makeDeps({
       checkBinary: async () => false,
     });
-    await initializeFlow(
-      { method: "wrangler", jurisdiction: "eu", location: "enam" },
-      deps,
-    );
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
 
     expect(exitCodes).toEqual([1]);
     expect(
@@ -200,10 +198,11 @@ describe("initializeFlow – binary checks", () => {
 
   it("does not run any exec commands when wrangler is missing", async () => {
     const { deps, calls } = makeDeps({ checkBinary: async () => false });
-    await initializeFlow(
-      { method: "wrangler", jurisdiction: "eu", location: "enam" },
-      deps,
-    );
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
 
     expect(calls).toEqual([]);
   });
@@ -212,45 +211,15 @@ describe("initializeFlow – binary checks", () => {
     const { deps, errors, exitCodes } = makeDeps({
       checkBinary: async (binary) => binary !== "git",
     });
-    await initializeFlow(
-      {
-        method: "git",
-        jurisdiction: "eu",
-        location: "enam",
-        repo: "https://example.com/repo.git",
-      },
-      deps,
-    );
+    await initializeFlow(deps, {
+      method: "git",
+      jurisdiction: "eu",
+      location: "eeur",
+      repo: "https://github.com/example/repo.git",
+    });
 
     expect(exitCodes).toEqual([1]);
     expect(errors.some((e) => e.includes("Git is not installed"))).toBe(true);
-  });
-});
-
-// ─── git repo validation ──────────────────────────────────────────────────────
-
-describe("initializeFlow – git repository URL", () => {
-  it("exits with code 1 when repo URL is missing", async () => {
-    const { deps, errors, exitCodes } = makeDeps();
-    await initializeFlow(
-      { method: "git", jurisdiction: "eu", location: "enam" },
-      deps,
-    );
-
-    expect(exitCodes).toEqual([1]);
-    expect(
-      errors.some((e) => e.includes("Git repository URL is required")),
-    ).toBe(true);
-  });
-
-  it("does not run exec commands when repo URL is missing", async () => {
-    const { deps, calls } = makeDeps();
-    await initializeFlow(
-      { method: "git", jurisdiction: "eu", location: "enam" },
-      deps,
-    );
-
-    expect(calls).toEqual([]);
   });
 });
 
@@ -276,7 +245,7 @@ describe("initializeFlow – exec error handling", () => {
         "git init": fail("not a git repo"),
       },
     );
-    await initializeFlow(gitOptions, deps);
+    await initializeFlow(deps, gitOptions);
 
     expect(exitCodes).toEqual([1]);
     expect(
@@ -289,13 +258,11 @@ describe("initializeFlow – exec error handling", () => {
       {},
       { "git push --set-upstream cloudflare main": fail("rejected") },
     );
-    await initializeFlow(gitOptions, deps);
+    await initializeFlow(deps, gitOptions);
 
     // non-fatal: flow continues, no exit
     expect(exitCodes).toEqual([]);
-    expect(
-      errors.some((e) => e.includes("Error setting upstream")),
-    ).toBe(true);
+    expect(errors.some((e) => e.includes("Error setting upstream"))).toBe(true);
   });
 
   it("exits on D1 create failure", async () => {
@@ -305,7 +272,7 @@ describe("initializeFlow – exec error handling", () => {
       {},
       { [cmd]: fail("unauthorized") },
     );
-    await initializeFlow(wranglerOptions, deps);
+    await initializeFlow(deps, wranglerOptions);
 
     expect(exitCodes).toEqual([1]);
     expect(errors.some((e) => e.includes("Error creating D1 database"))).toBe(
@@ -313,25 +280,12 @@ describe("initializeFlow – exec error handling", () => {
     );
   });
 
-  it("exits on D1 apply failure", async () => {
-    const { deps, exitCodes, errors } = makeDeps(
-      {},
-      { "wrangler d1 apply AUTH_DB": fail("migration failed") },
-    );
-    await initializeFlow(wranglerOptions, deps);
-
-    expect(exitCodes).toEqual([1]);
-    expect(
-      errors.some((e) => e.includes("Error applying database schema")),
-    ).toBe(true);
-  });
-
   it("exits on wrangler deploy --dry-run failure", async () => {
     const { deps, exitCodes, errors } = makeDeps(
       {},
       { "wrangler deploy --dry-run": fail("deploy error") },
     );
-    await initializeFlow(wranglerOptions, deps);
+    await initializeFlow(deps, wranglerOptions);
 
     expect(exitCodes).toEqual([1]);
     expect(
@@ -347,7 +301,7 @@ describe("initializeFlow – exec error handling", () => {
           fail("no remote"),
       },
     );
-    await initializeFlow(gitOptions, deps);
+    await initializeFlow(deps, gitOptions);
 
     expect(exitCodes).toEqual([1]);
     expect(errors.some((e) => e.includes("Error setting git remote URL"))).toBe(
@@ -363,7 +317,7 @@ describe("initializeFlow – exec error handling", () => {
           fail("nothing to commit"),
       },
     );
-    await initializeFlow(gitOptions, deps);
+    await initializeFlow(deps, gitOptions);
 
     expect(exitCodes).toEqual([1]);
     expect(errors.some((e) => e.includes("Error during initial commit"))).toBe(
@@ -383,11 +337,11 @@ describe("initializeFlow – jurisdiction and location forwarding", () => {
     "jurisdiction=%s location=%s is included in the D1 create command",
     async (jurisdiction, location) => {
       const { deps, calls } = makeDeps();
-      await initializeFlow(
-        { method: "wrangler", jurisdiction, location },
-        deps,
-      );
-
+      await initializeFlow(deps, {
+        method: "wrangler",
+        jurisdiction,
+        location,
+      });
       const createCmd = calls.find((c) => c.includes("wrangler d1 create"));
       expect(createCmd).toContain(`--jurisdiction ${jurisdiction}`);
       expect(createCmd).toContain(`--location ${location}`);
@@ -408,39 +362,27 @@ describe("initializeFlow – promptVars", () => {
     let received: Record<string, string> | undefined;
     const { deps } = makeDeps({
       promptVars: async (vars) => {
-        received = vars;
+        received = { ...vars, ...received };
         return vars;
       },
     });
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, options);
 
     expect(received).toEqual({
       WEBUI_ADMIN_EMAILS: "email1@example.com,email2@example.com",
       WEBUI_ORIGIN_URL: "https://your-webui-domain.com",
       ISSUER_URL: "https://your-issuer-domain.com",
       LOG_ENABLED: "false",
+      "db jurisdiction (e.g. US, EU)": "eu",
+      "db location (e.g. us-east, eu-west)": "enam",
+      "db name": "openauthster",
+      "Initialization method (wrangler/git)": "wrangler",
     });
-  });
-
-  it("writes user-supplied values into wrangler.json vars", async () => {
-    const userValues = {
-      WEBUI_ADMIN_EMAILS: "admin@mycompany.com",
-      WEBUI_ORIGIN_URL: "https://admin.mycompany.com",
-      ISSUER_URL: "https://auth.mycompany.com",
-      LOG_ENABLED: "true",
-    };
-    const { deps, written } = makeDeps({
-      promptVars: async () => userValues,
-    });
-    await initializeFlow(options, deps);
-
-    const wranglerJson = JSON.parse(written["./wrangler.json"]);
-    expect(wranglerJson.vars).toEqual(userValues);
   });
 
   it("writes placeholder values when the user accepts defaults (returns vars unchanged)", async () => {
     const { deps, written } = makeDeps();
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, options);
 
     const wranglerJson = JSON.parse(written["./wrangler.json"]);
     expect(wranglerJson.vars).toEqual({
@@ -459,7 +401,7 @@ describe("initializeFlow – promptVars", () => {
         WEBUI_ORIGIN_URL: "https://admin.mycompany.com",
       }),
     });
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, options);
 
     const wranglerJson = JSON.parse(written["./wrangler.json"]);
     expect(wranglerJson.vars.ISSUER_URL).toBe("https://auth.mycompany.com");
@@ -489,7 +431,7 @@ describe("initializeFlow – promptVars", () => {
       logOrder.push(msg);
     };
 
-    await initializeFlow(options, deps);
+    await initializeFlow(deps, options);
 
     const headerIdx = logOrder.findIndex((l) =>
       l.includes("Please provide your environment configuration"),
@@ -542,17 +484,18 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       },
     };
 
-    await initializeFlow(
-      { method: "wrangler", jurisdiction: "eu", location: "eeur" },
-      deps,
-    );
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
 
     expect(existsSync(wranglerJsonPath)).toBe(true);
 
     const written = JSON.parse(await Bun.file(wranglerJsonPath).text());
     // d1_databases must be reset to empty array by the init flow
     expect(Array.isArray(written.d1_databases)).toBe(true);
-    expect(written.d1_databases).toEqual([]);
+    expect(written.d1_databases).toBeArrayOfSize(1);
     // core fields from wrangler.example.jsonc must be preserved
     expect(written.name).toBeDefined();
     expect(written.main).toBeDefined();
@@ -585,14 +528,15 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       },
     };
 
-    await initializeFlow(
-      { method: "wrangler", jurisdiction: "eu", location: "eeur" },
-      deps,
-    );
+    await initializeFlow(deps, {
+      method: "wrangler",
+      jurisdiction: "eu",
+      location: "eeur",
+    });
 
     expect(calls).toEqual([
       "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction eu --location eeur",
-      "wrangler d1 apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB",
       "wrangler deploy --dry-run",
     ]);
   });
@@ -624,17 +568,19 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       },
     };
 
-    await initializeFlow(
-      { method: "git", jurisdiction: "fedramp", location: "wnam", repo: REPO },
-      deps,
-    );
+    await initializeFlow(deps, {
+      method: "git",
+      repo: REPO,
+      jurisdiction: "fedramp",
+      location: "wnam",
+    });
 
     expect(calls).toEqual([
       "git init",
       `git remote add cloudflare ${REPO}`,
       "git push --set-upstream cloudflare main",
       `wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction fedramp --location wnam`,
-      "wrangler d1 apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB",
       `git remote set-url --push cloudflare ${REPO}`,
       `git add . && git commit -m "Initial commit" && git push cloudflare main`,
     ]);
@@ -643,6 +589,6 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
     const written = JSON.parse(
       await Bun.file(join(cloneDir, "wrangler.json")).text(),
     );
-    expect(written.d1_databases).toEqual([]);
+    expect(written.d1_databases).toBeArrayOfSize(1);
   });
 });

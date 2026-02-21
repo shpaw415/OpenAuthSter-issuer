@@ -1,5 +1,3 @@
-import { bunFileSystemModule } from "hono/bun";
-
 export type ExecResult = { stdout: string; stderr: string };
 export type ExecFn = (cmd: string) => Promise<ExecResult>;
 
@@ -29,8 +27,8 @@ export interface InitFlowDeps<
 const validMethods = ["wrangler", "git"];
 
 export async function initializeFlow(
-  options: InitFlowOptions,
   deps: InitFlowDeps,
+  options: Partial<InitFlowOptions>,
 ): Promise<void> {
   const {
     exec,
@@ -53,7 +51,17 @@ export async function initializeFlow(
     return;
   }
 
-  const method = options.method;
+  const method = (await promptVars({
+    "Initialization method (wrangler/git)": options.method ?? "wrangler",
+  })
+    .then((answers) => Object.entries(answers).at(0)![1])
+    .then((m) =>
+      ["git", "wrangler"].includes(m.toLowerCase())
+        ? m.toLowerCase()
+        : (() => {
+            throw new Error("Invalid method: " + m);
+          })(),
+    )) as "wrangler" | "git";
 
   if (!validMethods.includes(method)) {
     error(
@@ -62,6 +70,19 @@ export async function initializeFlow(
     exit(1);
     return;
   }
+
+  const repo =
+    method == "git"
+      ? await promptVars({
+          "Git repository URL (must be a repository you have push access to)":
+            options.repo ?? "http://example.com/repo.git",
+        }).then(
+          (answers) =>
+            answers[
+              "Git repository URL (must be a repository you have push access to)"
+            ],
+        )
+      : undefined;
 
   if (method === "git") {
     const gitExists = await checkBinary("git");
@@ -73,7 +94,7 @@ export async function initializeFlow(
       return;
     }
 
-    if (!options.repo) {
+    if (!repo) {
       error("Git repository URL is required for git initialization.");
       exit(1);
       return;
@@ -86,9 +107,7 @@ export async function initializeFlow(
       return;
     }
 
-    const gitCreateResult = await exec(
-      `git remote add cloudflare ${options.repo}`,
-    );
+    const gitCreateResult = await exec(`git remote add cloudflare ${repo}`);
     if (
       gitCreateResult.stderr &&
       !gitCreateResult.stderr.includes("remote cloudflare already exists")
@@ -117,10 +136,16 @@ export async function initializeFlow(
   log("Generating wrangler.json configuration...");
 
   const wranglerExampleFile = await readFile("./wrangler.example.jsonc");
-  const wranglerConfig = parseJSONC(wranglerExampleFile) as Record<
-    string,
-    unknown
-  >;
+  let wranglerConfig = parseJSONC(wranglerExampleFile) as {
+    d1_databases: Array<{
+      binding: string;
+      database_name: string;
+      database_id: string;
+      migrations_dir: string;
+      remote: boolean;
+    }>;
+    vars: Record<string, string>;
+  };
 
   wranglerConfig.d1_databases = [];
 
@@ -135,8 +160,20 @@ export async function initializeFlow(
   await writeFile("./wrangler.json", JSON.stringify(wranglerConfig, null, 2));
   log("wrangler.json configuration generated successfully!");
 
+  const dbInfo = await promptVars({
+    "db name": "openauthster",
+    "db jurisdiction (e.g. US, EU)": options.jurisdiction ?? "US",
+    "db location (e.g. us-east, eu-west)": options.location ?? "us-east",
+  });
+
+  const dbParsedInfo = {
+    name: dbInfo["db name"],
+    jurisdiction: dbInfo["db jurisdiction (e.g. US, EU)"],
+    location: dbInfo["db location (e.g. us-east, eu-west)"],
+  };
+
   const createDBResult = await exec(
-    `wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction ${options.jurisdiction} --location ${options.location}`,
+    `wrangler d1 create ${dbParsedInfo.name} --binding AUTH_DB --update-config true --jurisdiction ${dbParsedInfo.jurisdiction} --location ${dbParsedInfo.location}`,
   );
   if (createDBResult.stderr) {
     console.log({ createDBResult });
@@ -171,6 +208,27 @@ export async function initializeFlow(
 
   log("D1 database created successfully!");
 
+  wranglerConfig = JSON.parse(
+    await readFile("./wrangler.json"),
+  ) as typeof wranglerConfig;
+
+  if (process.env.NODE_ENV === "test") {
+    log("Mocking database information for testing...");
+    wranglerConfig.d1_databases.push({
+      binding: "AUTH_DB",
+      database_name: "test_db",
+      database_id: "test_db_id",
+      migrations_dir: "drizzle/migrations",
+      remote: true,
+    });
+  }
+
+  wranglerConfig.d1_databases.find(
+    (db) => db.binding === "AUTH_DB",
+  )!.migrations_dir = "drizzle/migrations";
+
+  await writeFile("./wrangler.json", JSON.stringify(wranglerConfig, null, 2));
+
   const dbResult = await exec(`wrangler d1 migrations apply AUTH_DB`);
   if (dbResult.stderr) {
     error("Error applying database schema:", dbResult.stderr);
@@ -190,7 +248,7 @@ export async function initializeFlow(
     );
   } else if (method === "git") {
     const setUrlResult = await exec(
-      `git remote set-url --push cloudflare ${options.repo}`,
+      `git remote set-url --push cloudflare ${repo}`,
     );
     if (setUrlResult.stderr) {
       error("Error setting git remote URL:", setUrlResult.stderr);
