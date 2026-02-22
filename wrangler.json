@@ -4,6 +4,14 @@
   "main": "src/index.ts",
   "name": "openauthster-issuer",
   "upload_source_maps": true,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "QR_AUTH_DO",
+        "class_name": "QRAuthDO"
+      }
+    ]
+  },
   "d1_databases": [
     {
       "binding": "AUTH_DB",
