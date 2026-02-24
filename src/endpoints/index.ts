@@ -848,7 +848,10 @@ endpoints.all("*", async (c) => {
     }),
     theme: await getThemeFromProject(project!, c.env),
     success: async (ctx, value, request) => {
-      console.log(`Successful authentication with value: `, value);
+      console.log(
+        `Successful authentication with value: `,
+        JSON.stringify({ value }, null, 2),
+      );
 
       await (
         await globalOpenAutsterConfig(c.env)
