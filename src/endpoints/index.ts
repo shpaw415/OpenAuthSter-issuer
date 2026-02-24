@@ -54,7 +54,6 @@ import { ensureInviteLinkIsValid, removeInviteLinkById } from "../invite-link";
 import { parse } from "valibot";
 import { deleteCache, getCache, setCache } from "../cache";
 import { WebHook } from "openauth-webui-shared-types/webhook";
-import { cors } from "hono/cors";
 import { createSelfClient } from "openauth-webui-shared-types/providers/utils";
 
 class PartialRequestError extends Error {
@@ -1179,11 +1178,12 @@ async function ensureToken({
 
   const origin = new URL(request.url).origin;
 
-  const selfClient = _createSelfClient({
+  const selfClient = createSelfClient({
     env,
     ctx,
     clientID,
-    url: origin,
+    issuerURI: origin,
+    issuer: Issuer,
   });
 
   const verified = await selfClient.verify(subjects, token);

@@ -1090,17 +1090,24 @@ const qrBuilder: ConfigType<
         QrUI: typeof import("openauth-webui-shared-types/providers/custom/qr/QRUI.tsx").QrUI;
         QRProvider: typeof import("openauth-webui-shared-types/providers/custom/qr/index.ts").QRProvider;
       };
+    const issuer = await import("../src/index.ts").then((m) => m.default);
+    const subject = await import("../openauth.config.ts").then(
+      (m) => m.subjects,
+    );
+
+    const issuerURI = project.authEndpointURL.startsWith("http")
+      ? project.authEndpointURL
+      : `https://${project.authEndpointURL}`;
+
     return QRProvider(
       QrUI({
-        issuerURI: env.ISSUER_URL,
+        issuerURI,
         appURI: project.originURL,
         binding: env.QR_AUTH_DO,
         copy: await getCopyTemplateFromId<"qr">(copyTemplateId ?? null, env),
         client_id: project.clientID,
-        issuer: (await import("./endpoints/index.ts").then(
-          (m) => m.endpoints,
-        )) as Hono,
-        subject: await import("../openauth.config.ts").then((m) => m.subjects),
+        issuer,
+        subject,
       }),
     );
   },
