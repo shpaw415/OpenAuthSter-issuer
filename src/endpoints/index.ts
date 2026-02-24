@@ -55,6 +55,7 @@ import { parse } from "valibot";
 import { deleteCache, getCache, setCache } from "../cache";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import { createSelfClient } from "openauth-webui-shared-types/providers/utils";
+import { BlankInput } from "hono/types";
 
 class PartialRequestError extends Error {
   status: ContentfulStatusCode;
@@ -842,6 +843,8 @@ endpoints.all("*", async (c) => {
       project: project!,
       env: c.env,
       copyTemplateId: params.copyID,
+      //@ts-ignore
+      ctx: c,
     }),
     theme: await getThemeFromProject(project!, c.env),
     success: async (ctx, value, request) => {
@@ -981,7 +984,7 @@ async function getOrCreateUser({
   const usersTable = OTFusersTable(project.clientID);
   const userData = await providerConfigMap[
     value.provider as keyof typeof providerConfigMap
-  ].parser(value, providerConfig);
+  ].parser(value, providerConfig, env, ctx as any);
 
   const exists = await userExists(env, userData.identifier, project.clientID);
 

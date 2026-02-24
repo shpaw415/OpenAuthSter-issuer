@@ -30,6 +30,8 @@ import {
 } from "openauth-webui-shared-types/database";
 import { JWTPayload } from "jose";
 import { WebHook } from "openauth-webui-shared-types/webhook";
+import type { Context } from "hono";
+import { BlankInput } from "hono/types";
 
 export type userExtractResult<T extends Record<string, any>> = {
   identifier: string;
@@ -42,6 +44,11 @@ export type userExtractFunction<
 > = (
   data: Input,
   providerConfig: ProviderConf,
+  env: Env,
+  ctx: Context<{
+    Bindings: Env;
+    Variables: { params: Params; project: Project };
+  }>,
 ) => userExtractResult<Output> | Promise<userExtractResult<Output>>;
 export type OnSuccessParserData<T> = {
   identifier: string;
@@ -70,6 +77,10 @@ type ConfigType<
     env: Env;
     project: Project;
     copyTemplateId: string | null;
+    ctx: Context<{
+      Bindings: Env;
+      Variables: { params: Params; project: Project };
+    }>;
   }) => Promise<Provider> | Provider;
   parser: userExtractFunction<Input, Output, ProviderConf>;
 };
@@ -1078,7 +1089,7 @@ const qrBuilder: ConfigType<
   { identifier: string; clientID: string },
   { identifier: string; clientID: string }
 > = {
-  async provider({ env, copyTemplateId, project }) {
+  async provider({ env, copyTemplateId, project, ctx }) {
     if (!project.originURL)
       throw new Error("Project origin URL is required for QR provider");
 
@@ -1099,15 +1110,18 @@ const qrBuilder: ConfigType<
       ? project.authEndpointURL
       : `https://${project.authEndpointURL}`;
 
+    const _issuerURI = new URL(ctx.req.url).origin;
+
     return QRProvider(
       QrUI({
-        issuerURI,
+        issuerURI: _issuerURI,
         appURI: project.originURL,
         binding: env.QR_AUTH_DO,
         copy: await getCopyTemplateFromId<"qr">(copyTemplateId ?? null, env),
         client_id: project.clientID,
+        //@ts-ignore
         issuer: issuer,
-        subject,
+        subject: subject,
       }),
     );
   },
@@ -1148,9 +1162,14 @@ async function generateProvidersFromConfig({
   project,
   env,
   copyTemplateId,
+  ctx,
 }: {
   project: Project;
   env: Env;
+  ctx: Context<{
+    Bindings: Env;
+    Variables: { params: Params; project: Project };
+  }>;
   copyTemplateId: string | null;
 }): Promise<Record<string, Provider<any>>> {
   const globalConfig: ExternalGlobalProjectConfig = await getGlobalConfig(env);
@@ -1169,6 +1188,7 @@ async function generateProvidersFromConfig({
               project,
               providerConfig,
               copyTemplateId,
+              ctx,
             }),
           };
         }),
