@@ -30,8 +30,6 @@ import {
 } from "openauth-webui-shared-types/database";
 import { JWTPayload } from "jose";
 import { WebHook } from "openauth-webui-shared-types/webhook";
-import { endTime } from "hono/timing";
-import { Hono } from "hono";
 
 export type userExtractResult<T extends Record<string, any>> = {
   identifier: string;
@@ -1090,7 +1088,9 @@ const qrBuilder: ConfigType<
         QrUI: typeof import("openauth-webui-shared-types/providers/custom/qr/QRUI.tsx").QrUI;
         QRProvider: typeof import("openauth-webui-shared-types/providers/custom/qr/index.ts").QRProvider;
       };
-    const issuer = await import("../src/index.ts").then((m) => m.default);
+    const issuer = await import("../src/endpoints/index.ts").then(
+      (m) => m.endpoints,
+    );
     const subject = await import("../openauth.config.ts").then(
       (m) => m.subjects,
     );
@@ -1106,7 +1106,7 @@ const qrBuilder: ConfigType<
         binding: env.QR_AUTH_DO,
         copy: await getCopyTemplateFromId<"qr">(copyTemplateId ?? null, env),
         client_id: project.clientID,
-        issuer,
+        issuer: issuer,
         subject,
       }),
     );

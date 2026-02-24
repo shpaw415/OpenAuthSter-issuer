@@ -1183,6 +1183,7 @@ async function ensureToken({
     ctx,
     clientID,
     issuerURI: origin,
+    //@ts-ignore
     issuer: Issuer,
   });
 
@@ -1192,7 +1193,8 @@ async function ensureToken({
   }
   return verified.subject.properties;
 }
-
+//TODO: delete this and use the one from utils when the refactor is done
+/*
 function _createSelfClient({
   env,
   ctx,
@@ -1214,6 +1216,7 @@ function _createSelfClient({
     },
   });
 }
+  */
 
 async function getUserPrivateData({
   userID,
