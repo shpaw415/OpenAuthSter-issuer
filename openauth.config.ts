@@ -1,6 +1,7 @@
 import { createSubjects } from "@openauthjs/openauth/subject";
 import { object, string, any, type InferOutput } from "valibot";
 import { createExternalGlobalProjectConfig } from "openauth-webui-shared-types";
+import { defaultSubjectSchema } from "openauth-webui-shared-types/client/user";
 
 export default async (env: Env) =>
   createExternalGlobalProjectConfig<InferOutput<typeof subjects.user>>({
@@ -23,11 +24,4 @@ export default async (env: Env) =>
 // This value should be shared between the OpenAuth server Worker and other
 // client Workers that you connect to it, so the types and schema validation are
 // consistent.
-export const subjects = createSubjects({
-  user: object({
-    id: string(),
-    data: any(),
-    clientID: string(),
-    provider: string(),
-  }),
-});
+export const subjects = defaultSubjectSchema;

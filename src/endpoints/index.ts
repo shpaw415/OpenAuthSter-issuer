@@ -867,6 +867,7 @@ endpoints.all("*", async (c) => {
       return ctx.subject("user", {
         id: userData.id,
         data: userData.data,
+        identifier: userData.identifier,
         clientID: params.clientID!,
         provider: value.provider,
       });

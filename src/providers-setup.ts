@@ -32,6 +32,7 @@ import { JWTPayload } from "jose";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import type { Context } from "hono";
 import { BlankInput } from "hono/types";
+import { QRProviderOnSuccessData } from "../../openauth-webui-shared-types/providers/custom/qr/index";
 
 export type userExtractResult<T extends Record<string, any>> = {
   identifier: string;
@@ -1086,8 +1087,8 @@ const yahooBuilder: ConfigType<
 
 const qrBuilder: ConfigType<
   ProviderConfig,
-  { identifier: string; clientID: string },
-  { identifier: string; clientID: string }
+  QRProviderOnSuccessData,
+  QRProviderOnSuccessData
 > = {
   async provider({ env, copyTemplateId, project, ctx }) {
     if (!project.originURL)
@@ -1106,15 +1107,9 @@ const qrBuilder: ConfigType<
       (m) => m.subjects,
     );
 
-    const issuerURI = project.authEndpointURL.startsWith("http")
-      ? project.authEndpointURL
-      : `https://${project.authEndpointURL}`;
-
-    const _issuerURI = new URL(ctx.req.url).origin;
-
     return QRProvider(
       QrUI({
-        issuerURI: _issuerURI,
+        issuerURI: new URL(ctx.req.url).origin,
         appURI: project.originURL,
         binding: env.QR_AUTH_DO,
         copy: await getCopyTemplateFromId<"qr">(copyTemplateId ?? null, env),
@@ -1126,9 +1121,9 @@ const qrBuilder: ConfigType<
     );
   },
   parser(data) {
-    console.log("data received after parsing:", { data });
+    console.log("data received after parsing:", JSON.stringify({ data }));
     return {
-      identifier: data.identifier,
+      identifier: data.id,
       data: data,
     };
   },
