@@ -30,6 +30,8 @@ import {
 } from "openauth-webui-shared-types/database";
 import { JWTPayload } from "jose";
 import { WebHook } from "openauth-webui-shared-types/webhook";
+import { endTime } from "hono/timing";
+import { Hono } from "hono";
 
 export type userExtractResult<T extends Record<string, any>> = {
   identifier: string;
@@ -275,8 +277,6 @@ function OAuth2Fetcher<UserInfo>(
     })
     .then((res) => res.json() as Promise<UserInfo>);
 }
-
-type ProviderToOutput<ProviderUserInfo> = Omit<ProviderUserInfo, "provider">;
 
 // Password Provider ///////////////////////
 
@@ -1073,6 +1073,46 @@ const yahooBuilder: ConfigType<
 
 ////////////////////////////////////////////
 
+// QR code Provider /////////////////////////////
+
+const qrBuilder: ConfigType<
+  ProviderConfig,
+  { identifier: string; clientID: string },
+  { identifier: string; clientID: string }
+> = {
+  async provider({ env, copyTemplateId, project }) {
+    if (!project.originURL)
+      throw new Error("Project origin URL is required for QR provider");
+
+    const { QrUI, QRProvider } =
+      //@ts-ignore
+      (await import("../node_modules/openauth-webui-shared-types/providers/build/qr/index.js")) as {
+        QrUI: typeof import("openauth-webui-shared-types/providers/custom/qr/QRUI.tsx").QrUI;
+        QRProvider: typeof import("openauth-webui-shared-types/providers/custom/qr/index.ts").QRProvider;
+      };
+    return QRProvider(
+      QrUI({
+        issuerURI: env.ISSUER_URL,
+        appURI: project.originURL,
+        binding: env.QR_AUTH_DO,
+        copy: await getCopyTemplateFromId<"qr">(copyTemplateId ?? null, env),
+        client_id: project.clientID,
+        issuer: (await import("./endpoints/index.ts").then(
+          (m) => m.endpoints,
+        )) as Hono,
+        subject: await import("../openauth.config.ts").then((m) => m.subjects),
+      }),
+    );
+  },
+  parser(data) {
+    console.log("data received after parsing:", { data });
+    return {
+      identifier: data.identifier,
+      data: data,
+    };
+  },
+};
+
 const providerConfigMap: Record<ProviderType, ConfigType<any, any, any>> = {
   code: codeConfigBuilder,
   oidc: oidcConfigBuilder,
@@ -1094,6 +1134,7 @@ const providerConfigMap: Record<ProviderType, ConfigType<any, any, any>> = {
   spotify: spotifyBuilder,
   twitch: twitchBuilder,
   yahoo: yahooBuilder,
+  qr: qrBuilder,
 };
 
 async function generateProvidersFromConfig({

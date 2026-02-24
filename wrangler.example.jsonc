@@ -13,6 +13,20 @@
       "remote": true,
     },
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "QR_AUTH_DO",
+        "class_name": "QRAuthDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["QRAuthDO"],
+    },
+  ],
   "observability": {
     "enabled": true,
   },

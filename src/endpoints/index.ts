@@ -55,6 +55,7 @@ import { parse } from "valibot";
 import { deleteCache, getCache, setCache } from "../cache";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import { cors } from "hono/cors";
+import { createSelfClient } from "openauth-webui-shared-types/providers/utils";
 
 class PartialRequestError extends Error {
   status: ContentfulStatusCode;
@@ -793,11 +794,15 @@ endpoints.all("*", async (c) => {
   const params: Params = c.get("params");
   const project: Project =
     c.get("project") || (await getProjectById(params.clientID!, c.env));
-  return await issuer({
+  const is = issuer({
     storage: D1Storage({
       database: c.env.AUTH_DB,
       table: params.clientID!,
     }),
+    ttl: {
+      access: 15 * 60, // 15 minutes in seconds
+      refresh: 7 * 24 * 60 * 60, // 7 days in seconds
+    },
     allow: async (input, req) => {
       const incomingUrl = new URL(input.redirectURI);
 
@@ -876,7 +881,8 @@ endpoints.all("*", async (c) => {
         request: req,
       });
     },
-  }).fetch(c.req.raw, c.env, c.executionCtx);
+  });
+  return is.fetch(c.req.raw, c.env, c.executionCtx);
 });
 
 // Auth helper functions //////////////////////////////////////////////////////
@@ -1173,7 +1179,7 @@ async function ensureToken({
 
   const origin = new URL(request.url).origin;
 
-  const selfClient = createSelfClient({
+  const selfClient = _createSelfClient({
     env,
     ctx,
     clientID,
@@ -1187,7 +1193,7 @@ async function ensureToken({
   return verified.subject.properties;
 }
 
-function createSelfClient({
+function _createSelfClient({
   env,
   ctx,
   clientID,

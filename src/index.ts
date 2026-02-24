@@ -1,7 +1,7 @@
 import { log } from "./share";
 import { insertLog } from "openauth-webui-shared-types/database";
 import { endpoints, RequestError } from "./endpoints";
-
+export { QRHandshake } from "openauth-webui-shared-types/providers/custom/DurableObject.ts";
 declare global {
   var isLog: boolean;
 }
