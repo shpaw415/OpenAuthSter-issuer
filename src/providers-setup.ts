@@ -1121,9 +1121,9 @@ const qrBuilder: ConfigType<
     );
   },
   parser(data) {
-    console.log("data received after parsing:", JSON.stringify({ data }));
+    //console.log("data received after parsing:", JSON.stringify({ data }));
     return {
-      identifier: data.id,
+      identifier: data.identifier,
       data: data,
     };
   },
