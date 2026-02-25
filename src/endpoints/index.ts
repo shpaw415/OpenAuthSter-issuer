@@ -868,11 +868,11 @@ endpoints.all("*", async (c) => {
         ctx: c,
       });
       return ctx.subject("user", {
-        id: userData.id,
-        data: userData.data,
-        identifier: userData.identifier,
+        id: userData.parser.id,
+        data: userData.dbUser?.data ?? {},
+        identifier: userData.dbUser?.identifier ?? "",
         clientID: params.clientID!,
-        provider: value.provider,
+        provider: userData.dbUser?.data?.provider ?? value.provider,
       });
     },
     async error(error, req) {
@@ -957,14 +957,12 @@ async function getThemeFromProject(project: Project, env: Env): Promise<Theme> {
 
 async function userExists(env: Env, identifier: string, clientID: string) {
   const usersTable = OTFusersTable(clientID);
-  return Boolean(
-    await drizzle(env.AUTH_DB)
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.identifier, identifier))
-      .limit(1)
-      .get(),
-  );
+  return drizzle(env.AUTH_DB)
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.identifier, identifier))
+    .limit(1)
+    .get();
 }
 
 async function getOrCreateUser({
@@ -984,7 +982,10 @@ async function getOrCreateUser({
     Bindings: Env;
     Variables: { params: Params; project: Project };
   }>;
-}): Promise<userExtractResult<{}> & { id: string }> {
+}): Promise<{
+  parser: userExtractResult<{}> & { id: string };
+  dbUser: Partial<OTFUsersParsedType>;
+}> {
   const usersTable = OTFusersTable(project.clientID);
   const userData = await providerConfigMap[
     value.provider as keyof typeof providerConfigMap
@@ -1036,7 +1037,12 @@ async function getOrCreateUser({
       endpoint: `${exists ? "login" : "registration"} flow`,
     });
 
-  const dataToStore = { ...userData.data, provider: value.provider };
+  const currentUserData = exists ? parseDBUser(exists) : null;
+
+  const dataToStore = {
+    ...userData.data,
+    provider: currentUserData?.data?.provider ?? value.provider,
+  };
   const result = (
     await drizzle(env.AUTH_DB)
       .insert(usersTable)
@@ -1052,7 +1058,7 @@ async function getOrCreateUser({
           data: JSON.stringify(dataToStore),
         },
       })
-      .returning({ id: usersTable.id })
+      .returning()
   ).at(0);
 
   if (!result) {
@@ -1079,7 +1085,10 @@ async function getOrCreateUser({
       });
     });
 
-  return { ...userData, id: result.id };
+  return {
+    parser: { ...userData, id: result.id },
+    dbUser: parseDBUser(result),
+  };
 }
 
 // Helper functions ////////////////////////////////////////////////////////

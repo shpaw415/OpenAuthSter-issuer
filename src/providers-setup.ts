@@ -31,7 +31,6 @@ import {
 import { JWTPayload } from "jose";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import type { Context } from "hono";
-import { BlankInput } from "hono/types";
 import { QRProviderOnSuccessData } from "../../openauth-webui-shared-types/providers/custom/qr/index";
 
 export type userExtractResult<T extends Record<string, any>> = {
