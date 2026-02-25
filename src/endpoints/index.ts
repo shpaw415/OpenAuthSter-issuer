@@ -1200,30 +1200,6 @@ async function ensureToken({
   }
   return verified.subject.properties;
 }
-//TODO: delete this and use the one from utils when the refactor is done
-/*
-function _createSelfClient({
-  env,
-  ctx,
-  clientID,
-  url,
-}: {
-  env: Env;
-  ctx: ExecutionContext;
-  clientID: string;
-  url?: string;
-}) {
-  return createClient({
-    clientID,
-    issuer: url ?? env.ISSUER_URL,
-    async fetch(input, init) {
-      const url = new URL(input);
-      url.searchParams.append("client_id", clientID);
-      return Issuer.fetch(new Request(url.toString(), init), env, ctx);
-    },
-  });
-}
-  */
 
 async function getUserPrivateData({
   userID,
