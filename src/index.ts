@@ -1,6 +1,7 @@
 import { log } from "./share";
 import { insertLog } from "openauth-webui-shared-types/database";
-import { endpoints, RequestError } from "./endpoints";
+import { endpoints } from "./endpoints";
+import { PartialRequestError, RequestError } from "./endpoints/error";
 export { QRHandshake } from "openauth-webui-shared-types/providers/custom/DurableObject.ts";
 declare global {
   var isLog: boolean;
@@ -14,6 +15,11 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
   try {
     return await endpoints.fetch(request, env, ctx);
   } catch (error) {
+    if (error instanceof PartialRequestError) {
+      log(`PartialRequestError: ${error.message}, status: ${error.status}`);
+      return new Response(error.message, { status: error.status });
+    }
+
     if (error instanceof RequestError) {
       await insertLog({
         clientID: error.params?.clientID || "unknown",

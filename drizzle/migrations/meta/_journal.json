@@ -43,6 +43,34 @@
       "when": 1771532635816,
       "tag": "0005_cheerful_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1772059727185,
+      "tag": "0006_curvy_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1772134450648,
+      "tag": "0007_tough_tarantula",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1772143517148,
+      "tag": "0008_spicy_gambit",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1772240622699,
+      "tag": "0009_ambitious_sally_floyd",
+      "breakpoints": true
     }
   ]
 }

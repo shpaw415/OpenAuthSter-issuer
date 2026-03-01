@@ -1,0 +1,1 @@
+ALTER TABLE `openauth_totp` ADD `clientID` text NOT NULL;

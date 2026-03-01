@@ -31,7 +31,7 @@ import {
 import { JWTPayload } from "jose";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import type { Context } from "hono";
-import { QRProviderOnSuccessData } from "../../openauth-webui-shared-types/providers/custom/qr/index";
+import type { QRProviderOnSuccessData } from "openauth-webui-shared-types/providers/custom/qr/index.ts";
 
 export type userExtractResult<T extends Record<string, any>> = {
   identifier: string;
@@ -402,7 +402,7 @@ const codeConfigBuilder: ConfigType<
   },
   { email?: string; phone?: string }
 > = {
-  provider: async ({ env, globalConfig, project, copyTemplateId }) => {
+  provider: async ({ env, globalConfig, project, copyTemplateId, ctx }) => {
     const copyData = await getCopyTemplateFromId<"code">(
       copyTemplateId ?? null,
       env,
@@ -416,7 +416,12 @@ const codeConfigBuilder: ConfigType<
           clientID: project.clientID,
           event: "code_sent",
           secret: project.secret,
-          data: { claim, code },
+          data: {
+            code,
+            method: project.codeMode,
+            send_to: claim.email || claim.phone,
+          },
+          request: ctx.req.raw,
         });
 
         console.log({ claim, code });
@@ -1128,6 +1133,35 @@ const qrBuilder: ConfigType<
   },
 };
 
+// Passkey Provider /////////////////////////////
+
+const passkeyBuilder: ConfigType<ProviderConfig, { id: string }, {}> = {
+  provider: async ({ env, copyTemplateId, project, ctx }) => {
+    const mod = (await import(
+      "../node_modules/openauth-webui-shared-types/providers/build/passkey/index.js" as any
+    )) as typeof import("../node_modules/openauth-webui-shared-types/providers/custom/passkey/index.ts");
+    return mod.WebAuthnProvider({
+      UI: mod.PassKeyUI({
+        copy: await getCopyTemplateFromId<"passkey">(
+          copyTemplateId ?? null,
+          env,
+        ),
+      }),
+      db: env.AUTH_DB,
+      origin: project.originURL!,
+      rpID: new URL(project.originURL!).hostname,
+    });
+  },
+  parser: async (data) => {
+    return {
+      identifier: data.id,
+      data: undefined,
+    };
+  },
+};
+
+// Provider Map /////////////////////////////
+
 const providerConfigMap: Record<ProviderType, ConfigType<any, any, any>> = {
   code: codeConfigBuilder,
   oidc: oidcConfigBuilder,
@@ -1150,6 +1184,7 @@ const providerConfigMap: Record<ProviderType, ConfigType<any, any, any>> = {
   twitch: twitchBuilder,
   yahoo: yahooBuilder,
   qr: qrBuilder,
+  passkey: passkeyBuilder,
 };
 
 async function generateProvidersFromConfig({
