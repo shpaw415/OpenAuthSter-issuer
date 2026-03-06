@@ -289,7 +289,7 @@ export async function initializeFlow(
     const initialCommitResult = await exec(`git push cloudflare main`);
     if (
       initialCommitResult.stderr &&
-      initialCommitResult.stderr != "Everything up-to-date"
+      !initialCommitResult.stderr.includes("Everything up-to-date")
     ) {
       error(
         "Error during initial commit and push:",
