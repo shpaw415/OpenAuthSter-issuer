@@ -147,11 +147,17 @@ export async function initializeFlow(
     vars: Record<string, string>;
   };
 
-  wranglerConfig.d1_databases =
-    JSON.parse(await readFile("wrangler.json")).d1_databases ?? [];
+  const currentWranglerConfig = (await fileExists("wrangler.json"))
+    ? (parseJSONC(await readFile("wrangler.json")) as typeof wranglerConfig)
+    : ({} as typeof wranglerConfig);
+
+  wranglerConfig.d1_databases = currentWranglerConfig?.d1_databases ?? [];
 
   // Prompt the user to fill in environment-specific vars
-  const exampleVars = (wranglerConfig.vars ?? {}) as Record<string, string>;
+  const exampleVars = {
+    ...wranglerConfig.vars,
+    ...currentWranglerConfig.vars,
+  } as Record<string, string>;
   log(
     "\nPlease provide your environment configuration (press Enter to keep the placeholder):",
   );
