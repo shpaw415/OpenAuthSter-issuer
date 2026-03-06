@@ -106,7 +106,10 @@ program
       console.log(await execSync("git add ."));
       console.log(
         Bun.spawnSync([
-          `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toLocaleDateString()}"`,
+          "git",
+          "commit",
+          "-m",
+          `"Deploying version ${packageJson.version} at: ${new Date().toLocaleDateString()}"`,
         ]),
       );
       const deployRes = await execSync(`git push cloudflare main`);
