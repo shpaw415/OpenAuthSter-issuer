@@ -163,7 +163,7 @@ export async function initializeFlow(
   );
   const filledVars = await promptVars(exampleVars);
   const filledaccountID = await promptVars({
-    account_id: wranglerConfig.account_id,
+    account_id: currentWranglerConfig.account_id ?? wranglerConfig.account_id,
   });
   wranglerConfig.vars = filledVars;
   wranglerConfig.account_id = filledaccountID.account_id;
