@@ -105,9 +105,9 @@ program
     } else if (deployMethod === "git") {
       console.log(await execSync("git add ."));
       console.log(
-        await execSync(
+        Bun.spawnSync([
           `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toLocaleDateString()}"`,
-        ),
+        ]),
       );
       const deployRes = await execSync(`git push cloudflare main`);
       if (
