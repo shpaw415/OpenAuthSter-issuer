@@ -44,8 +44,11 @@ export async function initializeFlow(
     error,
   } = deps;
 
+  const pkgjson = await readFile("./package.json").then((c) => JSON.parse(c));
+
   const method = (await promptVars({
-    "Initialization method (wrangler/git)": options.method ?? "wrangler",
+    "Initialization method (wrangler/git)":
+      options.method ?? pkgjson.deploy_method ?? "wrangler",
   })
     .then((answers) => Object.entries(answers).at(0)![1])
     .then((m) =>
@@ -63,8 +66,6 @@ export async function initializeFlow(
     exit(1);
     return;
   }
-
-  const pkgjson = await readFile("./package.json").then((c) => JSON.parse(c));
 
   const repo =
     method == "git"
