@@ -108,7 +108,10 @@ program
         `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toISOString()}"`,
       );
       const deployRes = await execSync(`git push cloudflare main`);
-      if (deployRes.stderr) {
+      if (
+        deployRes.stderr &&
+        deployRes.stderr.toLowerCase().includes("error")
+      ) {
         console.error("Error pushing to git:", deployRes.stderr);
         process.exit(1);
       } else {
