@@ -108,6 +108,12 @@ export async function initializeFlow(
       exit(1);
       return;
     }
+    const gitSetMainBranch = await exec("git branch -M main");
+    if (gitSetMainBranch.stderr) {
+      error("Error setting main branch:", gitSetMainBranch.stderr);
+      exit(1);
+      return;
+    }
 
     const gitCreateResult = await exec(`git remote add cloudflare ${repo}`);
     if (
@@ -139,6 +145,7 @@ export async function initializeFlow(
 
   const wranglerExampleFile = await readFile("./wrangler.example.jsonc");
   let wranglerConfig = parseJSONC(wranglerExampleFile) as {
+    account_id: string;
     d1_databases: Array<{
       binding: string;
       database_name: string;
@@ -157,7 +164,11 @@ export async function initializeFlow(
     "\nPlease provide your environment configuration (press Enter to keep the placeholder):",
   );
   const filledVars = await promptVars(exampleVars);
+  const filledaccountID = await promptVars({
+    account_id: wranglerConfig.account_id,
+  });
   wranglerConfig.vars = filledVars;
+  wranglerConfig.account_id = filledaccountID.account_id;
 
   await writeFile("./wrangler.json", JSON.stringify(wranglerConfig, null, 2));
   log("wrangler.json configuration generated successfully!");
