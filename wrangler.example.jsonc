@@ -17,14 +17,14 @@
     "bindings": [
       {
         "name": "QR_AUTH_DO",
-        "class_name": "QRAuthDO",
+        "class_name": "QRHandshake",
       },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["QRAuthDO"],
+      "new_sqlite_classes": ["QRHandshake"],
     },
   ],
   "observability": {

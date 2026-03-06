@@ -1,5 +1,4 @@
-import { createSubjects } from "@openauthjs/openauth/subject";
-import { object, string, any, type InferOutput } from "valibot";
+import { type InferOutput } from "valibot";
 import { createExternalGlobalProjectConfig } from "openauth-webui-shared-types";
 import { defaultSubjectSchema } from "openauth-webui-shared-types/client/user";
 
