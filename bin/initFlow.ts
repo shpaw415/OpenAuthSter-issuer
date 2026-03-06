@@ -14,6 +14,7 @@ export interface InitFlowDeps<
   exec: ExecFn;
   checkBinary: (binary: string) => Promise<boolean>;
   readFile: (path: string) => Promise<string>;
+  fileExists: (path: string) => Promise<boolean>;
   writeFile: (path: string, content: string) => Promise<void>;
   parseJSONC: (content: string) => Record<string, unknown>;
   /** Prompt the user to fill in each var. Receives the vars from the example
@@ -35,6 +36,7 @@ export async function initializeFlow(
     checkBinary,
     readFile,
     writeFile,
+    fileExists,
     parseJSONC,
     promptVars,
     exit,
@@ -42,21 +44,12 @@ export async function initializeFlow(
     error,
   } = deps;
 
-  const packageManager = (await checkBinary("npm"))
-    ? "npm"
-    : (await checkBinary("bun"))
-      ? "bun"
-      : null;
-
-  if (!packageManager) {
-    error(
-      "Neither npm nor bun is installed. Please install one of them to continue.",
-    );
-    exit(1);
-    return;
-  }
-
-  await exec(`${packageManager} install --production`);
+  log("Installing dependencies...");
+  await exec(`bun install`).then((res) =>
+    res.stderr
+      ? log("Error installing dependencies:\n", res.stderr)
+      : log("Dependencies installed successfully!"),
+  );
 
   const method = (await promptVars({
     "Initialization method (wrangler/git)": options.method ?? "wrangler",
@@ -190,6 +183,22 @@ export async function initializeFlow(
     jurisdiction: dbInfo["db jurisdiction (e.g. eu, fedramp)"],
     location: dbInfo["db location (e.g. weur, eeur, apac, oc, wnam, enam)"],
   };
+
+  const envFileContent = (await fileExists(".env"))
+    ? await readFile(".env")
+    : "";
+
+  const apitoken = await promptVars({
+    "Cloudflare API Token (with permissions to manage D1 databases)": "",
+  }).then(
+    (res) =>
+      res["Cloudflare API Token (with permissions to manage D1 databases)"],
+  );
+
+  await writeFile(
+    ".env",
+    `${envFileContent}\nCLOUDFLARE_API_TOKEN=${apitoken}`,
+  );
 
   const createDBResult = await exec(
     `wrangler d1 create ${dbParsedInfo.name} --binding AUTH_DB --update-config true --jurisdiction ${dbParsedInfo.jurisdiction} --location ${dbParsedInfo.location}`,

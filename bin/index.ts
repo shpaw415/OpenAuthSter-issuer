@@ -59,6 +59,7 @@ program
         exec: execSync,
         checkBinary: checkBinaryExists,
         readFile: (path) => Bun.file(path).text(),
+        fileExists: (path) => Bun.file(path).exists(),
         writeFile: (path, content) => Bun.write(path, content).then(() => {}),
         parseJSONC: (content) =>
           Bun.JSONC.parse(content) as Record<string, unknown>,

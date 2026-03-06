@@ -19,8 +19,8 @@ OpenAuthster Issuer is the core authentication server that powers the OpenAuthst
 ## Prerequisites
 
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) - Cloudflare's command-line tool
-- [Bun.js](https://bun.sh) (recommended) or Node.js
-- Cloudflare account with Workers and D1 access
+- [Bun.js](https://bun.sh)
+- Cloudflare account with Workers, D1, Durable Object access
 
 ```bash
 # Install Wrangler globally
