@@ -298,7 +298,7 @@ export async function initializeFlow(
       return;
     }
     await exec("git add .");
-    await exec(`git commit -m "Initial commit"`);
+    await exec(`git commit -m "Initial-commit"`);
     const initialCommitResult = await exec(`git push cloudflare main`);
     if (
       initialCommitResult.stderr &&
