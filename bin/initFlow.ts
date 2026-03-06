@@ -44,13 +44,6 @@ export async function initializeFlow(
     error,
   } = deps;
 
-  log("Installing dependencies...");
-  await exec(`bun install`).then((res) =>
-    res.stderr
-      ? log("Error installing dependencies:\n", res.stderr)
-      : log("Dependencies installed successfully!"),
-  );
-
   const method = (await promptVars({
     "Initialization method (wrangler/git)": options.method ?? "wrangler",
   })
@@ -294,7 +287,10 @@ export async function initializeFlow(
     await exec("git add .");
     await exec(`git commit -m "Initial commit"`);
     const initialCommitResult = await exec(`git push cloudflare main`);
-    if (initialCommitResult.stderr) {
+    if (
+      initialCommitResult.stderr &&
+      initialCommitResult.stderr != "Everything up-to-date"
+    ) {
       error(
         "Error during initial commit and push:",
         initialCommitResult.stderr,

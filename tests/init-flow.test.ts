@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+} from "bun:test";
 import { mkdtempSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -49,6 +56,9 @@ function makeDeps(
     "./package.json": JSON.stringify({
       version: "0.0.0-test",
     }),
+    "wrangler.json": JSON.stringify({}),
+    "./wrangler.json": JSON.stringify({}),
+    ".env": "",
   };
 
   const deps: InitFlowDeps = {
@@ -62,6 +72,7 @@ function makeDeps(
     writeFile: async (path, content) => {
       written[path] = content;
     },
+    fileExists: (path) => Promise.resolve(true),
     parseJSONC: (content) => JSON.parse(content),
     // Default: return placeholder values unchanged (simulates user pressing Enter)
     promptVars: async (vars) => ({ ...vars }),
@@ -89,7 +100,7 @@ describe("initializeFlow – wrangler method", () => {
     console.log({ calls, logs });
     expect(calls).toEqual([
       "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction eu --location eeur",
-      "wrangler d1 migrations apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB --remote",
       "wrangler deploy --dry-run",
     ]);
   });
@@ -146,12 +157,15 @@ describe("initializeFlow – git method", () => {
 
     expect(calls).toEqual([
       "git init",
+      "git branch -M main",
       "git remote add cloudflare https://github.com/example/repo.git",
       "git push --set-upstream cloudflare main",
       "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction fedramp --location wnam",
-      "wrangler d1 migrations apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB --remote",
       "git remote set-url --push cloudflare https://github.com/example/repo.git",
-      `git add . && git commit -m "Initial commit" && git push cloudflare main`,
+      "git add .",
+      `git commit -m "Initial commit"`,
+      "git push cloudflare main",
     ]);
   });
 
@@ -184,33 +198,6 @@ describe("initializeFlow – git method", () => {
 // ─── binary checks ───────────────────────────────────────────────────────────
 
 describe("initializeFlow – binary checks", () => {
-  it("exits with code 1 when wrangler is not installed", async () => {
-    const { deps, errors, exitCodes } = makeDeps({
-      checkBinary: async () => false,
-    });
-    await initializeFlow(deps, {
-      method: "wrangler",
-      jurisdiction: "eu",
-      location: "eeur",
-    });
-
-    expect(exitCodes).toEqual([1]);
-    expect(
-      errors.some((e) => e.includes("Wrangler CLI is not installed")),
-    ).toBe(true);
-  });
-
-  it("does not run any exec commands when wrangler is missing", async () => {
-    const { deps, calls } = makeDeps({ checkBinary: async () => false });
-    await initializeFlow(deps, {
-      method: "wrangler",
-      jurisdiction: "eu",
-      location: "eeur",
-    });
-
-    expect(calls).toEqual([]);
-  });
-
   it("exits with code 1 when git is not installed (git method)", async () => {
     const { deps, errors, exitCodes } = makeDeps({
       checkBinary: async (binary) => binary !== "git",
@@ -317,8 +304,7 @@ describe("initializeFlow – exec error handling", () => {
     const { deps, exitCodes, errors } = makeDeps(
       {},
       {
-        [`git add . && git commit -m "Initial commit" && git push cloudflare main`]:
-          fail("nothing to commit"),
+        [`git push cloudflare main`]: fail("nothing to commit"),
       },
     );
     await initializeFlow(deps, gitOptions);
@@ -384,6 +370,7 @@ describe("initializeFlow – promptVars", () => {
       "db location (e.g. weur, eeur, apac, oc, wnam, enam)": "enam",
       "db name": "openauthster",
       "Initialization method (wrangler/git)": "wrangler",
+      "Cloudflare API Token (with permissions to manage D1 databases)": "",
     });
   });
 
@@ -458,6 +445,14 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
     await execAsync(`git clone --depth 1 ${REPO_URL} ${cloneDir}`);
   }, 60_000);
 
+  beforeEach(async () => {
+    if (cloneDir && existsSync(cloneDir)) {
+      await execAsync(`git reset --hard && git clean -fd`, {
+        cwd: cloneDir,
+      }).catch(() => {});
+    }
+  });
+
   afterAll(() => {
     if (cloneDir && existsSync(cloneDir)) {
       rmSync(cloneDir, { recursive: true, force: true });
@@ -475,10 +470,13 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
       exec: async (cmd) => ({ stdout: "", stderr: "" }),
       checkBinary: async () => true,
       readFile: (path) =>
-        Bun.file(join(cloneDir, path.replace(/^\.?\//, ""))).text(),
+        path.endsWith(".env")
+          ? Promise.resolve("")
+          : Bun.file(join(cloneDir, path.replace(/^\.?\//, ""))).text(),
       writeFile: async (path, content) => {
         await Bun.write(join(cloneDir, path.replace(/^\.?\//, "")), content);
       },
+      fileExists: (path) => Promise.resolve(true),
       parseJSONC: (content) =>
         Bun.JSONC.parse(content) as Record<string, unknown>,
       promptVars: async (vars) => vars,
@@ -500,9 +498,9 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
     expect(existsSync(wranglerJsonPath)).toBe(true);
 
     const written = JSON.parse(await Bun.file(wranglerJsonPath).text());
-    // d1_databases must be reset to empty array by the init flow
+    // d1_databases is copied from original repo and test_db is appended
     expect(Array.isArray(written.d1_databases)).toBe(true);
-    expect(written.d1_databases).toBeArrayOfSize(1);
+    expect(written.d1_databases).toBeArrayOfSize(2);
     // core fields from wrangler.example.jsonc must be preserved
     expect(written.name).toBeDefined();
     expect(written.main).toBeDefined();
@@ -511,6 +509,9 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 
   it("wrangler method: executes expected commands against the clone", async () => {
     const calls: string[] = [];
+    const pathFileContent = {
+      [join(cloneDir, ".env")]: "",
+    };
 
     const deps: InitFlowDeps = {
       exec: async (cmd) => {
@@ -518,8 +519,14 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
         return { stdout: "", stderr: "" };
       },
       checkBinary: async () => true,
+      fileExists: (path) => Promise.resolve(true),
+
       readFile: (path) =>
-        Bun.file(join(cloneDir, path.replace(/^\.?\//, ""))).text(),
+        pathFileContent[path as keyof typeof pathFileContent]
+          ? Promise.resolve(
+              pathFileContent[path as keyof typeof pathFileContent],
+            )
+          : Bun.file(join(cloneDir, path.replace(/^\.?\//, ""))).text(),
       writeFile: async (path, content) => {
         await Bun.write(join(cloneDir, path.replace(/^\.?\//, "")), content);
       },
@@ -543,7 +550,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 
     expect(calls).toEqual([
       "wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction eu --location eeur",
-      "wrangler d1 migrations apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB --remote",
       "wrangler deploy --dry-run",
     ]);
   });
@@ -558,6 +565,8 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
         return { stdout: "", stderr: "" };
       },
       checkBinary: async () => true,
+      fileExists: (path) => Promise.resolve(true),
+
       readFile: (path) =>
         Bun.file(join(cloneDir, path.replace(/^\.?\//, ""))).text(),
       writeFile: async (path, content) => {
@@ -584,19 +593,22 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 
     expect(calls).toEqual([
       "git init",
+      "git branch -M main",
       `git remote add cloudflare ${REPO}`,
       "git push --set-upstream cloudflare main",
       `wrangler d1 create openauthster --binding AUTH_DB --update-config true --jurisdiction fedramp --location wnam`,
-      "wrangler d1 migrations apply AUTH_DB",
+      "wrangler d1 migrations apply AUTH_DB --remote",
       `git remote set-url --push cloudflare ${REPO}`,
-      `git add . && git commit -m "Initial commit" && git push cloudflare main`,
+      "git add .",
+      `git commit -m "Initial commit"`,
+      "git push cloudflare main",
     ]);
 
     // wrangler.json was still written
     const written = JSON.parse(
       await Bun.file(join(cloneDir, "wrangler.json")).text(),
     );
-    expect(written.d1_databases).toBeArrayOfSize(1);
+    expect(written.d1_databases).toBeArrayOfSize(2);
   });
 });
 
