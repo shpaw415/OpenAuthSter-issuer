@@ -106,7 +106,7 @@ program
       console.log(await execSync("git add ."));
       console.log(
         await execSync(
-          `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toISOString()}"`,
+          `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toLocaleDateString()}"`,
         ),
       );
       const deployRes = await execSync(`git push cloudflare main`);
