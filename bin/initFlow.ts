@@ -289,7 +289,10 @@ export async function initializeFlow(
     const initialCommitResult = await exec(`git push cloudflare main`);
     if (
       initialCommitResult.stderr &&
-      !initialCommitResult.stderr.includes("Everything up-to-date")
+      !initialCommitResult.stderr
+        .trim()
+        .toLowerCase()
+        .includes("everything up-to-date")
     ) {
       error(
         "Error during initial commit and push:",
@@ -298,6 +301,14 @@ export async function initializeFlow(
       exit(1);
       return;
     }
+
+    log(
+      "Initial commit pushed successfully! Please set up your cloudflare worker to deploy from the git repository and deploy the worker",
+    );
+
+    log(
+      "Edit openauth.config.ts to add your email sending configuration and any other configuration changes you want to make. then call `bun run cli deploy` to deploy your changes",
+    );
   }
 
   log("Initialization successful!");
