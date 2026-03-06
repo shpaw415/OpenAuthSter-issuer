@@ -110,7 +110,7 @@ program
           "commit",
           "-m",
           `"Deploying version ${packageJson.version} at: ${new Date().toLocaleDateString()}"`,
-        ]),
+        ]).stdout.toString("utf8"),
       );
       const deployRes = await execSync(`git push cloudflare main`);
       if (
