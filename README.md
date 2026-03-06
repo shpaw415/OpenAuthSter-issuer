@@ -62,9 +62,20 @@ git clone https://github.com/shpaw415/OpenAuthSter-issuer.git openauth-issuer
 cd openauth-issuer
 ```
 
+### 2a. Auto initialize
+
+```bash
+bun run cli initialize
+# follow the instructions
+```
+
+> the initialize will manage all the remaining config. you can skip to **7**.
+
+---
+
 > ⚠️ **Security Note:** Keep your issuer repository private as it contains sensitive authentication configuration and secrets.
 
-### 2. Install Dependencies
+### 2b. Install Dependencies
 
 ```bash
 bun install

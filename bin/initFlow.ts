@@ -42,16 +42,21 @@ export async function initializeFlow(
     error,
   } = deps;
 
-  await exec("bun i --production");
+  const packageManager = (await checkBinary("npm"))
+    ? "npm"
+    : (await checkBinary("bun"))
+      ? "bun"
+      : null;
 
-  const wranglerExists = await checkBinary("wrangler");
-  if (!wranglerExists) {
+  if (!packageManager) {
     error(
-      "Wrangler CLI is not installed. Please install it from https://developers.cloudflare.com/workers/wrangler/install-and-update/",
+      "Neither npm nor bun is installed. Please install one of them to continue.",
     );
     exit(1);
     return;
   }
+
+  await exec(`${packageManager} install --production`);
 
   const method = (await promptVars({
     "Initialization method (wrangler/git)": options.method ?? "wrangler",

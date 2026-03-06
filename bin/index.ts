@@ -86,6 +86,44 @@ program
     );
   });
 
+program
+  .command("deploy")
+  .description("Deploy the OpenAuth Multitenant Server")
+  .action(async () => {
+    const deployMethod =
+      (packageJson as { deploy_method?: "git" | "wrangler" }).deploy_method ||
+      "wrangler";
+
+    if (deployMethod === "wrangler") {
+      const deploymentRes = await execSync(`wrangler deploy`);
+      if (deploymentRes.stderr) {
+        console.error("Error deploying with wrangler:", deploymentRes.stderr);
+      } else {
+        console.log("Deployment successful!: ", deploymentRes.stdout);
+      }
+    } else if (deployMethod === "git") {
+      await execSync("git add .");
+      await execSync(
+        `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toISOString()}"`,
+      );
+      const deployRes = await execSync(`git push cloudflare main`);
+      if (deployRes.stderr) {
+        console.error("Error pushing to git:", deployRes.stderr);
+        process.exit(1);
+      } else {
+        console.log("Deployment successful!: ", deployRes.stdout);
+        console.log(
+          "go to your cloudflare dashboard to see the deployment status",
+        );
+      }
+    } else {
+      console.error(
+        "Invalid deployment method specified in package.json. Please set deploy_method to either 'wrangler' or 'git'.",
+      );
+      process.exit(1);
+    }
+  });
+
 function checkBinaryExists(binary: string): Promise<boolean> {
   return new Promise((resolve) => {
     exec(`which ${binary}`, (error) => {
