@@ -64,11 +64,15 @@ export async function initializeFlow(
     return;
   }
 
+  const pkgjson = await readFile("./package.json").then((c) => JSON.parse(c));
+
   const repo =
     method == "git"
       ? await promptVars({
           "Git repository URL (must be a repository you have push access to)":
-            options.repo ?? "http://example.com/repo.git",
+            options.repo ??
+            pkgjson?.repository?.url ??
+            "http://example.com/repo.git",
         }).then(
           (answers) =>
             answers[
@@ -267,8 +271,10 @@ export async function initializeFlow(
     return;
   }
 
-  const pkgjson = JSON.parse(await readFile("./package.json"));
   pkgjson.deploy_method = method;
+  pkgjson.repository = {
+    url: repo,
+  };
   await writeFile("./package.json", JSON.stringify(pkgjson, null, 2));
 
   if (method === "wrangler") {
