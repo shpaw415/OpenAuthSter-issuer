@@ -154,7 +154,8 @@ export async function initializeFlow(
     vars: Record<string, string>;
   };
 
-  wranglerConfig.d1_databases = [];
+  wranglerConfig.d1_databases =
+    JSON.parse(await readFile("wrangler.json")).d1_databases ?? [];
 
   // Prompt the user to fill in environment-specific vars
   const exampleVars = (wranglerConfig.vars ?? {}) as Record<string, string>;
