@@ -2,7 +2,7 @@ import { log } from "./share";
 import { insertLog } from "openauth-webui-shared-types/database";
 import { endpoints } from "./endpoints";
 import { PartialRequestError, RequestError } from "./endpoints/error";
-export { QRHandshake } from "openauth-webui-shared-types/providers/custom/DurableObject.ts";
+import { QRHandshake as Handshack } from "openauth-webui-shared-types/providers/custom/DurableObject.ts";
 declare global {
   var isLog: boolean;
 }
@@ -57,3 +57,5 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
 export default {
   fetch: _fetch,
 } satisfies ExportedHandler<Env>;
+
+export const QRHandshake = Handshack;

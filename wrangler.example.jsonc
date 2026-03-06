@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "compatibility_date": "2025-10-08",
+  "compatibility_date": "2026-01-27",
   "main": "src/index.ts",
   "name": "openauthster-issuer",
   "upload_source_maps": true,
