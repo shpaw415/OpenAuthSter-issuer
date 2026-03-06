@@ -188,17 +188,19 @@ export async function initializeFlow(
     ? await readFile(".env")
     : "";
 
-  const apitoken = await promptVars({
-    "Cloudflare API Token (with permissions to manage D1 databases)": "",
-  }).then(
-    (res) =>
-      res["Cloudflare API Token (with permissions to manage D1 databases)"],
-  );
+  if (!envFileContent.includes("CLOUDFLARE_API_TOKEN")) {
+    const apitoken = await promptVars({
+      "Cloudflare API Token (with permissions to manage D1 databases)": "",
+    }).then(
+      (res) =>
+        res["Cloudflare API Token (with permissions to manage D1 databases)"],
+    );
 
-  await writeFile(
-    ".env",
-    `${envFileContent}\nCLOUDFLARE_API_TOKEN=${apitoken}`,
-  );
+    await writeFile(
+      ".env",
+      `${envFileContent}\nCLOUDFLARE_API_TOKEN=${apitoken}`,
+    );
+  }
 
   const createDBResult = await exec(
     `wrangler d1 create ${dbParsedInfo.name} --binding AUTH_DB --update-config true --jurisdiction ${dbParsedInfo.jurisdiction} --location ${dbParsedInfo.location}`,
