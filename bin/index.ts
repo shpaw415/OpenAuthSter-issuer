@@ -103,9 +103,11 @@ program
         console.log("Deployment successful!: ", deploymentRes.stdout);
       }
     } else if (deployMethod === "git") {
-      await execSync("git add .");
-      await execSync(
-        `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toISOString()}"`,
+      console.log(await execSync("git add ."));
+      console.log(
+        await execSync(
+          `git commit -m "Deploying version ${packageJson.version} at: ${new Date().toISOString()}"`,
+        ),
       );
       const deployRes = await execSync(`git push cloudflare main`);
       if (
