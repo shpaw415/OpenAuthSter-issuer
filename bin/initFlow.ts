@@ -142,6 +142,7 @@ export async function initializeFlow(
   const wranglerExampleFile = await readFile("./wrangler.example.jsonc");
   let wranglerConfig = parseJSONC(wranglerExampleFile) as {
     account_id: string;
+    name: string;
     d1_databases: Array<{
       binding: string;
       database_name: string;
@@ -262,6 +263,10 @@ export async function initializeFlow(
   wranglerConfig.d1_databases.find(
     (db) => db.binding === "AUTH_DB",
   )!.migrations_dir = "drizzle/migrations";
+
+  wranglerConfig.name = await promptVars({
+    "Cloudflare Worker name": currentWranglerConfig.name ?? wranglerConfig.name,
+  }).then((res) => res["Cloudflare Worker name"]);
 
   await writeFile("./wrangler.json", JSON.stringify(wranglerConfig, null, 2));
 
