@@ -260,7 +260,7 @@ export async function initializeFlow(
 
   await writeFile("./wrangler.json", JSON.stringify(wranglerConfig, null, 2));
 
-  const dbResult = await exec(`wrangler d1 migrations apply AUTH_DB`);
+  const dbResult = await exec(`wrangler d1 migrations apply AUTH_DB --remote`);
   if (dbResult.stderr) {
     error("Error applying database schema:", dbResult.stderr);
     exit(1);
