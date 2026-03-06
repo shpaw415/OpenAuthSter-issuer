@@ -233,8 +233,9 @@ export async function initializeFlow(
       return;
     }
   }
-
   log("D1 database created successfully!");
+
+  log("Generating Tables");
 
   wranglerConfig = JSON.parse(
     await readFile("./wrangler.json"),
@@ -264,6 +265,10 @@ export async function initializeFlow(
     return;
   }
 
+  const pkgjson = JSON.parse(await readFile("./package.json"));
+  pkgjson.deploy_method = method;
+  await writeFile("./package.json", JSON.stringify(pkgjson, null, 2));
+
   if (method === "wrangler") {
     const deployResult = await exec(`wrangler deploy --dry-run`);
     if (deployResult.stderr) {
@@ -283,10 +288,9 @@ export async function initializeFlow(
       exit(1);
       return;
     }
-
-    const initialCommitResult = await exec(
-      `git add . && git commit -m "Initial commit" && git push cloudflare main`,
-    );
+    await exec("git add .");
+    await exec(`git commit -m "Initial commit"`);
+    const initialCommitResult = await exec(`git push cloudflare main`);
     if (initialCommitResult.stderr) {
       error(
         "Error during initial commit and push:",
@@ -296,10 +300,6 @@ export async function initializeFlow(
       return;
     }
   }
-
-  const pkgjson = JSON.parse(await readFile("./package.json"));
-  pkgjson.deploy_method = method;
-  await writeFile("./package.json", JSON.stringify(pkgjson, null, 2));
 
   log("Initialization successful!");
 }
