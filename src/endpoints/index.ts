@@ -74,6 +74,8 @@ import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
+import type { RegistrationResponseJSON } from "@simplewebauthn/server";
+import { cors } from "hono/cors";
 
 export const endpoints = new Hono<{
   Bindings: Env;
@@ -112,14 +114,17 @@ const protectEndpointWithMFA = createMiddleware(async (c, next) => {
 });
 const userInfoRetriver = createMiddleware(async (c, next) => {
   const params: Params = c.get("params");
+  const token = getTokenFromRequest(c.req.raw);
   const userInfo = await ensureToken({
-    token: getTokenFromRequest(c.req.raw),
+    token,
     clientID: params.clientID!,
     env: c.env,
     ctx: c.executionCtx,
     request: c.req.raw,
   });
+
   c.set("userInfo", userInfo);
+  return next();
 });
 
 // Utility Endpoints /////////////////////////////////////////////////////////
@@ -150,87 +155,65 @@ endpoints.get("/clear-cache/:key", (c) => {
   return c.json({ status: "ok" }, 200);
 });
 
-/**
- * Allow CORS preflight requests
- */
-endpoints.options("*", (c) => {
-  return c.text("ok", 200, {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS, DELETE, POST",
-    "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, x-elevated-token",
-  });
-});
-
 // middleware ////////////////////////////////////////////////////////////
 
-endpoints.use(
-  "*",
-  createMiddleware(async (c, next) => {
-    const params = await requestToParams(c.req.raw, c.env);
-    c.set("params", params);
+endpoints
+  .use(
+    "*",
+    createMiddleware(async (c, next) => {
+      const params = await requestToParams(c.req.raw, c.env);
+      c.set("params", params);
 
-    if (c.req.raw.url.startsWith("/.well-known/")) return next(); // skip CORS for well-known endpoints
+      if (c.req.raw.url.startsWith("/.well-known/")) return next(); // skip CORS for well-known endpoints
 
-    const { clientID, copyID, inviteID } = params;
-    console.log({
-      cookies: { clientID, copyID, inviteID },
-      url: c.req.raw.url,
-    });
-
-    if (params.clientID) {
-      c.set("project", await getProjectById(params.clientID, c.env));
-    }
-
-    await next();
-
-    if (clientID) {
-      setCookie(c, COOKIE_NAME, clientID, {
-        httpOnly: true,
-        maxAge: 60 * 60 * 24 * 1, // 1 day
+      const { clientID, copyID, inviteID } = params;
+      console.log({
+        cookies: { clientID, copyID, inviteID },
+        url: c.req.raw.url,
       });
-    }
-    if (copyID) {
-      setCookie(c, COOKIE_COPY_TEMPLATE_ID, copyID, {
-        httpOnly: true,
-        maxAge: 60 * 60 * 24 * 1, // 1 day
-      });
-    }
-    if (inviteID) {
-      setCookie(c, COOKIE_INVITE_ID, inviteID, {
-        maxAge: 60 * 60 * 24, // 1 day
-        httpOnly: true,
-      });
-    }
 
-    c.header("Access-Control-Allow-Origin", "*");
-    c.header(
-      "Access-Control-Allow-Methods",
-      "GET, PATCH, OPTIONS, DELETE, POST",
-    );
-    c.header("Access-Control-Allow-Credentials", "true");
-    c.header(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, Cookie, x-elevated-token",
-    );
+      if (params.clientID) {
+        c.set("project", await getProjectById(params.clientID, c.env));
+      }
+
+      await next();
+
+      if (clientID) {
+        setCookie(c, COOKIE_NAME, clientID, {
+          httpOnly: true,
+          maxAge: 60 * 60 * 24 * 1, // 1 day
+        });
+      }
+      if (copyID) {
+        setCookie(c, COOKIE_COPY_TEMPLATE_ID, copyID, {
+          httpOnly: true,
+          maxAge: 60 * 60 * 24 * 1, // 1 day
+        });
+      }
+      if (inviteID) {
+        setCookie(c, COOKIE_INVITE_ID, inviteID, {
+          maxAge: 60 * 60 * 24, // 1 day
+          httpOnly: true,
+        });
+      }
+    }),
+  )
+  .use("*", (c, next) => {
+    const project = c.get("project") as Project | undefined;
     c.header("Cache-Control", "no-store");
     c.header("Vary", "Origin");
-
-    if (c.req.method === "OPTIONS") return;
-    c.header(
-      "Access-Control-Allow-Origin",
-      c.get("project")?.originURL ||
-        (
-          await getProject({
-            id: params.clientID!,
-            env: c.env,
-            ctx: c,
-          })
-        )?.originURL ||
-        c.env.WEBUI_ORIGIN_URL,
-    );
-  }),
-);
+    return cors({
+      origin: project?.originURL || c.env.WEBUI_ORIGIN_URL,
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Cookie",
+        "x-elevated-token",
+      ],
+      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+      credentials: true,
+    })(c, next);
+  });
 
 // Protected endpoints with MFA requirement ////////////////////////////////////////////////////////////
 
@@ -1552,17 +1535,16 @@ endpoints
   });
 
 // passkey endpoints ///////////////////////////////////////////////////////////
-endpoints.use("/passkey/*", userInfoRetriver);
+endpoints.use("/passkey/register/*", userInfoRetriver);
 endpoints
   .post("/passkey/register/start", async (c) => {
-    const userInfo = c.get("userInfo"); // Récupéré via ton middleware d'auth
+    const project = c.get("project");
+    const userInfo = c.get("userInfo");
     const { userDisplayName } = await c.req.json();
 
     if (!userDisplayName) {
       return c.json({ error: "Missing userDisplayName in request body" }, 400);
     }
-
-    console.log("Starting passkey registration for user:", userInfo.id);
 
     const db = drizzle(c.env.AUTH_DB);
 
@@ -1574,11 +1556,12 @@ endpoints
 
     // 2. Générer les options pour le navigateur
     const options = await generateRegistrationOptions({
-      rpName: "OpenAuthster",
-      rpID: new URL(c.env.ISSUER_URL).hostname, // ex: 'auth.tonprojet.com'
-      userID: new Uint8Array(new TextEncoder().encode(userInfo.id)), // Doit être un Uint8Array
+      rpName: project.clientID.replaceAll("_", " "),
+      rpID: new URL(project.originURL!).hostname,
+      userID: new Uint8Array(new TextEncoder().encode(userInfo.id)),
       userName: userDisplayName,
-      attestationType: "none", // 'none' est recommandé pour la vie privée (Passkeys standards)
+      userDisplayName: userDisplayName,
+      attestationType: "none",
       excludeCredentials: existingCredentials.map((cred) => ({
         id: cred.credential_id as string,
         transports: ["internal"],
@@ -1594,7 +1577,6 @@ endpoints
 
     await db.insert(webauthnChallengesTable).values({
       id: challengeId,
-      user_id: userInfo.id,
       clientID: userInfo.clientID,
       challenge: options.challenge,
       expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
@@ -1606,19 +1588,18 @@ endpoints
   })
   .post("/passkey/register/finish", async (c) => {
     const userInfo = c.get("userInfo");
-    const { challengeId, response } = await c.req.json(); // 'response' vient de navigator.credentials.create()
+    const project = c.get("project");
+    const { challengeId, response } = (await c.req.json()) as {
+      challengeId: string;
+      response: RegistrationResponseJSON;
+    }; // 'response' vient de navigator.credentials.create()
 
     const db = drizzle(c.env.AUTH_DB);
 
     const DBchallenge = await db
       .select()
       .from(webauthnChallengesTable)
-      .where(
-        and(
-          eq(webauthnChallengesTable.id, challengeId),
-          eq(webauthnChallengesTable.user_id, userInfo.id),
-        ),
-      )
+      .where(and(eq(webauthnChallengesTable.id, challengeId)))
       .get();
 
     if (
@@ -1636,8 +1617,8 @@ endpoints
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge,
-        expectedOrigin: "https://ton-app.com", // L'URL de ton frontend React/Client
-        expectedRPID: new URL(c.env.ISSUER_URL).hostname,
+        expectedOrigin: project.originURL!,
+        expectedRPID: new URL(project.originURL!).hostname,
       });
     } catch (error) {
       return c.json({ error: (error as Error).message }, 400);
@@ -1778,7 +1759,22 @@ endpoints.use(
     return next();
   }),
 );
-endpoints.use;
+
+// Options Cors
+
+/**
+ * Allow CORS preflight requests
+ */
+endpoints.options("*", (c) => {
+  const project = c.get("project") as Project | undefined;
+  console.log(project);
+  return c.text("ok", 200, {
+    "Access-Control-Allow-Origin": project?.originURL || "*",
+    "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS, DELETE, POST",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, x-elevated-token",
+  });
+});
 
 endpoints.all("*", async (c) => {
   const params: Params = c.get("params");
@@ -2040,7 +2036,7 @@ async function getOrCreateUser({
   const userResult = await drizzle(env.AUTH_DB)
     .insert(usersTable)
     .values({
-      id: crypto.randomUUID() + crypto.randomUUID(),
+      id: crypto.randomUUID(),
       identifier: userData.identifier,
       data: JSON.stringify(dataToStore),
       created_at: new Date().toISOString(),

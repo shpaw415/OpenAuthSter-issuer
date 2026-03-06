@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "moduleResolution": "bundler",
-    "types": ["./worker-configuration.d.ts", "./types.d.ts"],
+    "types": ["./worker-configuration.d.ts", "./types.d.ts", "@types/node"],
     "noEmit": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,

@@ -1135,7 +1135,7 @@ const qrBuilder: ConfigType<
 
 // Passkey Provider /////////////////////////////
 
-const passkeyBuilder: ConfigType<ProviderConfig, { id: string }, {}> = {
+const passkeyBuilder: ConfigType<ProviderConfig, { identifier: string }, {}> = {
   provider: async ({ env, copyTemplateId, project, ctx }) => {
     const mod = (await import(
       "../node_modules/openauth-webui-shared-types/providers/build/passkey/index.js" as any
@@ -1154,7 +1154,7 @@ const passkeyBuilder: ConfigType<ProviderConfig, { id: string }, {}> = {
   },
   parser: async (data) => {
     return {
-      identifier: data.id,
+      identifier: data.identifier,
       data: undefined,
     };
   },
