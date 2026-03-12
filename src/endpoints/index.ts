@@ -53,7 +53,7 @@ import globalOpenAutsterConfig, { subjects } from "../../openauth.config";
 import packageJson from "../../package.json" with { type: "json" };
 
 import { parse } from "valibot";
-import { deleteCache, getCache, setCache } from "../cache";
+import { deleteCache, getAllCache, getCache, setCache } from "../cache";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import { createSelfClient } from "openauth-webui-shared-types/providers/utils";
 import type { EndpointCtx, EndpointVariables, Params } from "./types";
@@ -172,6 +172,8 @@ endpoints
 
       if (params.clientID) {
         c.set("project", await getProjectById(params.clientID, c.env));
+      } else {
+        c.set("project", await getProjectByHost(new URL(c.req.url), c.env));
       }
 
       await next();
@@ -206,8 +208,17 @@ endpoints
     const project = c.get("project") as Project | undefined;
     c.header("Cache-Control", "no-store");
     c.header("Vary", "Origin");
+
+    const requestOrigin = new URL(c.req.url).origin;
+    const authorizedOrigins =
+      project?.originURL?.split(",").map((e) => e.trim()) ?? [];
+
+    const allowOrigin =
+      authorizedOrigins.find((origin) => origin === requestOrigin) ??
+      c.env.WEBUI_ORIGIN_URL;
+
     return cors({
-      origin: project?.originURL || c.env.WEBUI_ORIGIN_URL,
+      origin: allowOrigin,
       allowHeaders: [
         "Content-Type",
         "Authorization",
@@ -1989,6 +2000,28 @@ async function getProjectById(
 
   const project = parseDBProject(projectData);
   setCache<Project>(clientId, project);
+  return project;
+}
+
+async function getProjectByHost(url: URL, env: Env): Promise<null | Project> {
+  const cachedProjects = getAllCache<Project>();
+  const cachedProject = cachedProjects.find(
+    (project) => project.authEndpointURL == url.hostname,
+  );
+  if (cachedProject) {
+    return cachedProject;
+  }
+
+  const projectData = await drizzle(env.AUTH_DB)
+    .select()
+    .from(projectTable)
+    .where(eq(projectTable.authEndpointURL, url.hostname))
+    .get();
+
+  if (!projectData) return null;
+
+  const project = parseDBProject(projectData);
+  setCache<Project>(project.clientID, project);
   return project;
 }
 
