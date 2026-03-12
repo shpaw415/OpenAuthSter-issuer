@@ -41,7 +41,7 @@ import { issuer } from "@openauthjs/openauth";
 
 // Internal imports
 import Issuer from "../";
-import { log } from "../share";
+import { log, toAuthorizeOrigin } from "../share";
 import { D1Storage } from "../db/d1-adapter";
 import {
   generateProvidersFromConfig,
@@ -209,22 +209,11 @@ endpoints
     c.header("Cache-Control", "no-store");
     c.header("Vary", "Origin");
 
-    const requestOrigin = new URL(c.req.url).origin;
-    const authorizedOrigins =
-      project?.originURL?.split(",").map((e) => e.trim()) ?? [];
-
-    const allowOrigin =
-      authorizedOrigins.find((origin) => origin === requestOrigin) ??
-      c.env.WEBUI_ORIGIN_URL;
-
-    console.log(
-      JSON.stringify({
-        requestOrigin,
-        authorizedOrigins,
-        allowOrigin,
-        project_name: project?.clientID,
-      }),
-    );
+    const allowOrigin = toAuthorizeOrigin({
+      request: c.req.raw,
+      project,
+      defaultOrigin: c.env.WEBUI_ORIGIN_URL,
+    });
 
     return cors({
       origin: allowOrigin,

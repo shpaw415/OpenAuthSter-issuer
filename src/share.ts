@@ -2,6 +2,7 @@ import {
   COOKIE_COPY_TEMPLATE_ID,
   COOKIE_NAME,
   COOKIE_INVITE_ID,
+  Project,
 } from "openauth-webui-shared-types";
 
 export function createInviteIdCookieContent(
@@ -75,4 +76,22 @@ export function log(...args: any[]) {
   if (globalThis.isLog) {
     console.log(...args);
   }
+}
+
+export function toAuthorizeOrigin({
+  request,
+  project,
+  defaultOrigin,
+}: {
+  request: Request;
+  project?: Project;
+  defaultOrigin: string;
+}) {
+  const requestOrigin = new URL(request.url).origin;
+  const authorizedOrigins =
+    project?.originURL?.split(",").map((origin) => origin.trim()) || [];
+  const allowOrigin = authorizedOrigins.includes(requestOrigin)
+    ? requestOrigin
+    : defaultOrigin;
+  return allowOrigin;
 }

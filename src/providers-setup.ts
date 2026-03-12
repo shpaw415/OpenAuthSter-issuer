@@ -32,6 +32,7 @@ import { JWTPayload } from "jose";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import type { Context } from "hono";
 import type { QRProviderOnSuccessData } from "openauth-webui-shared-types/providers/custom/qr/index.ts";
+import { toAuthorizeOrigin } from "./share.ts";
 
 export type userExtractResult<T extends Record<string, any>> = {
   identifier: string;
@@ -1102,12 +1103,8 @@ const qrBuilder: ConfigType<
         QrUI: typeof import("openauth-webui-shared-types/providers/custom/qr/QRUI.tsx").QrUI;
         QRProvider: typeof import("openauth-webui-shared-types/providers/custom/qr/index.ts").QRProvider;
       };
-    const issuer = await import("./endpoints/index").then(
-      (m) => m.endpoints,
-    );
-    const subject = await import("../openauth.config").then(
-      (m) => m.subjects,
-    );
+    const issuer = await import("./endpoints/index").then((m) => m.endpoints);
+    const subject = await import("../openauth.config").then((m) => m.subjects);
 
     return QRProvider(
       QrUI({
@@ -1138,6 +1135,13 @@ const passkeyBuilder: ConfigType<ProviderConfig, { identifier: string }, {}> = {
     const mod = (await import(
       "../node_modules/openauth-webui-shared-types/providers/build/passkey/index.js" as any
     )) as typeof import("../node_modules/openauth-webui-shared-types/providers/custom/passkey/index.ts");
+
+    const autorizedOrigin = toAuthorizeOrigin({
+      request: ctx.req.raw,
+      project,
+      defaultOrigin: env.WEBUI_ORIGIN_URL,
+    });
+
     return mod.WebAuthnProvider({
       UI: mod.PassKeyUI({
         copy: await getCopyTemplateFromId<"passkey">(
@@ -1146,8 +1150,8 @@ const passkeyBuilder: ConfigType<ProviderConfig, { identifier: string }, {}> = {
         ),
       }),
       db: env.AUTH_DB,
-      origin: project.originURL!,
-      rpID: new URL(project.originURL!).hostname,
+      origin: autorizedOrigin,
+      rpID: new URL(autorizedOrigin).hostname,
     });
   },
   parser: async (data) => {
