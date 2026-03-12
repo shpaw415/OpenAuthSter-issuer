@@ -217,6 +217,13 @@ endpoints
       authorizedOrigins.find((origin) => origin === requestOrigin) ??
       c.env.WEBUI_ORIGIN_URL;
 
+    console.log({
+      requestOrigin,
+      authorizedOrigins,
+      allowOrigin,
+      project_name: project?.clientID,
+    });
+
     return cors({
       origin: allowOrigin,
       allowHeaders: [
