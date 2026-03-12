@@ -38,9 +38,9 @@ export async function getSecretFromRequest(
     ["verify"],
   );
 
-  const sigBuffer = new Uint8Array(
-    signature.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)),
-  );
+  const matches = signature.match(/.{1,2}/g);
+  if (!matches) return { error: "invalid_signature" };
+  const sigBuffer = new Uint8Array(matches.map((byte) => parseInt(byte, 16)));
 
   const isValid = await crypto.subtle.verify(
     "HMAC",

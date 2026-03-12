@@ -138,7 +138,6 @@ async function sendCodeWithEmail({
   switch (globalConfig.register.strategy.email?.provider) {
     case "resend":
       const apiKey = globalConfig.register.strategy.email.apiKey;
-      console.log(`Sending code ${code} to ${to} via Resend`);
       const result = await new (await import("resend")).Resend(
         apiKey,
       ).emails.send({
@@ -338,7 +337,7 @@ const passwordConfigBuilder: ConfigType<
                 return shortPasswordMsg || "Password is too short.";
               else if (
                 requireUppercase &&
-                password.toLocaleUpperCase() === password
+                password === password.toLocaleLowerCase()
               )
                 return (
                   requireUppercaseMsg ||
@@ -424,7 +423,6 @@ const codeConfigBuilder: ConfigType<
           request: ctx.req.raw,
         });
 
-        console.log({ claim, code });
         switch (project.codeMode) {
           case "email":
             if (!claim.email) {
@@ -1104,10 +1102,10 @@ const qrBuilder: ConfigType<
         QrUI: typeof import("openauth-webui-shared-types/providers/custom/qr/QRUI.tsx").QrUI;
         QRProvider: typeof import("openauth-webui-shared-types/providers/custom/qr/index.ts").QRProvider;
       };
-    const issuer = await import("../src/endpoints/index.ts").then(
+    const issuer = await import("./endpoints/index").then(
       (m) => m.endpoints,
     );
-    const subject = await import("../openauth.config.ts").then(
+    const subject = await import("../openauth.config").then(
       (m) => m.subjects,
     );
 

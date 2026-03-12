@@ -50,7 +50,7 @@ import {
 } from "../providers-setup";
 import DefaultTheme from "../defaults/theme";
 import globalOpenAutsterConfig, { subjects } from "../../openauth.config";
-import packageJson from "../../package.json" assert { type: "json" };
+import packageJson from "../../package.json" with { type: "json" };
 
 import { parse } from "valibot";
 import { deleteCache, getCache, setCache } from "../cache";
@@ -148,11 +148,7 @@ endpoints
  * **Will be used in the v0.3.0 of the webUI**
  */
 endpoints.get("/clear-cache/:key", (c) => {
-  const key = c.req.param("key");
-  if (key) {
-    deleteCache(key);
-  }
-  return c.json({ status: "ok" }, 200);
+  return c.json({ status: "not_implemented" }, 501);
 });
 
 // middleware ////////////////////////////////////////////////////////////
@@ -167,10 +163,12 @@ endpoints
       if (c.req.raw.url.startsWith("/.well-known/")) return next(); // skip CORS for well-known endpoints
 
       const { clientID, copyID, inviteID } = params;
-      console.log({
-        cookies: { clientID, copyID, inviteID },
-        url: c.req.raw.url,
-      });
+      if (globalThis.isLog) {
+        console.log({
+          cookies: { clientID, copyID, inviteID },
+          url: c.req.raw.url,
+        });
+      }
 
       if (params.clientID) {
         c.set("project", await getProjectById(params.clientID, c.env));
@@ -181,19 +179,25 @@ endpoints
       if (clientID) {
         setCookie(c, COOKIE_NAME, clientID, {
           httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
           maxAge: 60 * 60 * 24 * 1, // 1 day
         });
       }
       if (copyID) {
         setCookie(c, COOKIE_COPY_TEMPLATE_ID, copyID, {
           httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
           maxAge: 60 * 60 * 24 * 1, // 1 day
         });
       }
       if (inviteID) {
         setCookie(c, COOKIE_INVITE_ID, inviteID, {
-          maxAge: 60 * 60 * 24, // 1 day
           httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
+          maxAge: 60 * 60 * 24, // 1 day
         });
       }
     }),
@@ -517,6 +521,7 @@ endpoints.use(
             })) || undefined,
           request: c.req.raw,
         });
+      throw err;
     }
 
     return next();
@@ -1140,7 +1145,7 @@ endpoints
       );
     }
     if (
-      new Date(user_totp.created_at).getTime() - Date.now() >
+      Date.now() - new Date(user_totp.created_at).getTime() >
       TOTP_TOKEN_EXPIRATION_MS
     ) {
       await db
@@ -1204,6 +1209,19 @@ endpoints
       request: c.req.raw,
       secret: project.secret,
       log: true,
+    });
+
+    await new WebHook({
+      db: c.env.AUTH_DB,
+    }).trigger({
+      clientID: project.clientID,
+      event: "mfa_setup",
+      data: {
+        userID: userInfo.id,
+      },
+      secret: project.secret,
+      log: true,
+      request: c.req.raw,
     });
 
     return c.json(totpResponse<null>({ success: true, data: null }), 200);
@@ -2064,7 +2082,7 @@ async function getOrCreateUser({
     `Found or created user ${userResult.id} with data ${JSON.stringify(userData.data)}`,
   );
 
-  await inviteHelper.removeInviteLinkById(params.inviteID!);
+  if (params.inviteID) await inviteHelper.removeInviteLinkById(params.inviteID);
   const event: WebHookEvents = exists
     ? "login_success"
     : "registration_success";
