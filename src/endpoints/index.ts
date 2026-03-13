@@ -176,6 +176,11 @@ endpoints
         c.set("project", await getProjectByHost(new URL(c.req.url), c.env));
       }
 
+      console.log(
+        "Project set in middleware:",
+        JSON.stringify(c.get("project")),
+      );
+
       await next();
 
       if (clientID) {
@@ -212,25 +217,28 @@ endpoints
     console.log(
       JSON.stringify({ project: project?.clientID, url: c.req.raw.url }),
     );
+    try {
+      const allowOrigin = toAuthorizeOrigin({
+        request: c.req.raw,
+        project,
+        defaultOrigin: c.env.WEBUI_ORIGIN_URL,
+      });
 
-    const allowOrigin = toAuthorizeOrigin({
-      request: c.req.raw,
-      project,
-      defaultOrigin: c.env.WEBUI_ORIGIN_URL,
-    });
+      await next();
 
-    await next();
-
-    c.header("Access-Control-Allow-Origin", allowOrigin);
-    c.header(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PATCH, DELETE, OPTIONS",
-    );
-    c.header(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, Cookie, x-elevated-token",
-    );
-    c.header("Access-Control-Allow-Credentials", "true");
+      c.header("Access-Control-Allow-Origin", allowOrigin);
+      c.header(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PATCH, DELETE, OPTIONS",
+      );
+      c.header(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, Cookie, x-elevated-token",
+      );
+      c.header("Access-Control-Allow-Credentials", "true");
+    } catch (err) {
+      console.error("Error in CORS middleware:", err);
+    }
   });
 
 // Protected endpoints with MFA requirement ////////////////////////////////////////////////////////////
