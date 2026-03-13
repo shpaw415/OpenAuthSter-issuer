@@ -90,6 +90,9 @@ export function toAuthorizeOrigin({
   const requestOrigin = new URL(request.url).origin;
   const authorizedOrigins =
     project?.originURL?.split(",").map((origin) => origin.trim()) || [];
+
+  console.log(JSON.stringify({ requestOrigin, authorizedOrigins }));
+
   const allowOrigin = authorizedOrigins.includes(requestOrigin)
     ? requestOrigin
     : defaultOrigin;
