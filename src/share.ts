@@ -87,14 +87,26 @@ export function toAuthorizeOrigin({
   project?: Project;
   defaultOrigin: string;
 }) {
-  const requestOrigin = new URL(request.url).origin;
-  const authorizedOrigins =
-    project?.originURL?.split(",").map((origin) => origin.trim()) || [];
+  try {
+    const requestOrigin = new URL(request.url).origin;
+    const authorizedOrigins =
+      project?.originURL?.split(",").map((origin) => origin.trim()) || [];
 
-  console.log(JSON.stringify({ requestOrigin, authorizedOrigins }));
+    console.log(JSON.stringify({ requestOrigin, authorizedOrigins }));
 
-  const allowOrigin = authorizedOrigins.includes(requestOrigin)
-    ? requestOrigin
-    : defaultOrigin;
-  return allowOrigin;
+    const allowOrigin = authorizedOrigins.includes(requestOrigin)
+      ? requestOrigin
+      : defaultOrigin;
+    return allowOrigin;
+  } catch (error) {
+    console.error(
+      "Error determining authorized origin:",
+      JSON.stringify({
+        requestUrl: request.url,
+        projectOrigin: project?.originURL,
+      }),
+      error,
+    );
+    return defaultOrigin;
+  }
 }

@@ -163,12 +163,10 @@ endpoints
       if (c.req.raw.url.startsWith("/.well-known/")) return next(); // skip CORS for well-known endpoints
 
       const { clientID, copyID, inviteID } = params;
-      if (globalThis.isLog) {
-        console.log({
-          cookies: { clientID, copyID, inviteID },
-          url: c.req.raw.url,
-        });
-      }
+      log({
+        cookies: { clientID, copyID, inviteID },
+        url: c.req.raw.url,
+      });
 
       if (params.clientID) {
         c.set("project", await getProjectById(params.clientID, c.env));
@@ -176,9 +174,13 @@ endpoints
         c.set("project", await getProjectByHost(new URL(c.req.url), c.env));
       }
 
-      console.log(
+      log(
         "Project set in middleware:",
-        JSON.stringify(c.get("project")),
+        JSON.stringify({
+          project: c.get("project"),
+          url: c.req.raw.url,
+          client_id: params.clientID,
+        }),
       );
 
       await next();
