@@ -94,7 +94,7 @@ const protectEndpointWithMFA = createMiddleware(async (c, next) => {
       token: getTokenFromRequest(c.req.raw),
       clientID: params.clientID!,
       env: c.env,
-      ctx: c.executionCtx,
+      ctx: c.executionCtx as ExecutionContext,
       request: c.req.raw,
     }));
   const mfaToken = getElevatedTokenFromRequest(c.req.raw);
@@ -119,7 +119,7 @@ const userInfoRetriver = createMiddleware(async (c, next) => {
     token,
     clientID: params.clientID!,
     env: c.env,
-    ctx: c.executionCtx,
+    ctx: c.executionCtx as ExecutionContext,
     request: c.req.raw,
   });
 
@@ -235,13 +235,16 @@ endpoints
       );
       c.header(
         "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, Cookie, x-elevated-token",
+        "Content-Type, Authorization, Cookie, x-elevated-token, Origin",
       );
       c.header("Access-Control-Allow-Credentials", "true");
     } catch (err) {
-      console.error("Error in CORS middleware:", err);
+      console.error("Error in CORS middleware:", String(err));
     }
-  });
+  })
+  .options("*", (c) => {
+    return c.text("ok");
+  }); // Handle preflight requests
 
 // Protected endpoints with MFA requirement ////////////////////////////////////////////////////////////
 
@@ -525,7 +528,7 @@ endpoints.use(
         token,
         clientID: params.clientID!,
         env: c.env,
-        ctx: c.executionCtx,
+        ctx: c.executionCtx as ExecutionContext,
         request: c.req.raw,
       });
       c.set("userInfo", userInfo);
@@ -860,7 +863,7 @@ endpoints.use(
       token: getTokenFromRequest(c.req.raw),
       clientID: params.clientID!,
       env: c.env,
-      ctx: c.executionCtx,
+      ctx: c.executionCtx as ExecutionContext,
       request: c.req.raw,
     });
     c.set("userInfo", userInfo);
@@ -1851,8 +1854,8 @@ endpoints.all("*", async (c) => {
       table: params.clientID!,
     }),
     ttl: {
-      access: (c.env as any).ACCESS_TTL ?? 900, // 15 minutes in seconds
-      refresh: (c.env as any).REFRESH_TTL ?? 604800, // 7 days in seconds
+      access: parseInt((c.env as any).ACCESS_TTL ?? "900"), // 15 minutes in seconds
+      refresh: parseInt((c.env as any).REFRESH_TTL ?? "604800"), // 7 days in seconds
       retention: 0,
       reuse: 60,
     },

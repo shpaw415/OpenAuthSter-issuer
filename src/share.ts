@@ -88,7 +88,9 @@ export function toAuthorizeOrigin({
   defaultOrigin: string;
 }) {
   try {
-    const requestOrigin = request.headers.get("Origin");
+    let requestOrigin =
+      request.headers.get("Origin") || request.headers.get("Referer");
+    requestOrigin = requestOrigin ? new URL(requestOrigin).origin : null;
     if (!requestOrigin) {
       return defaultOrigin;
     }
