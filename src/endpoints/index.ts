@@ -218,17 +218,19 @@ endpoints
       project,
       defaultOrigin: c.env.WEBUI_ORIGIN_URL,
     });
-    return cors({
-      origin: allowOrigin,
-      allowHeaders: [
-        "Content-Type",
-        "Authorization",
-        "Cookie",
-        "x-elevated-token",
-      ],
-      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      credentials: true,
-    })(c, next);
+
+    await next();
+
+    c.header("Access-Control-Allow-Origin", allowOrigin);
+    c.header(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PATCH, DELETE, OPTIONS",
+    );
+    c.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, Cookie, x-elevated-token",
+    );
+    c.header("Access-Control-Allow-Credentials", "true");
   });
 
 // Protected endpoints with MFA requirement ////////////////////////////////////////////////////////////
