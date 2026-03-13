@@ -88,7 +88,10 @@ export function toAuthorizeOrigin({
   defaultOrigin: string;
 }) {
   try {
-    const requestOrigin = new URL(request.url).origin;
+    const requestOrigin = request.headers.get("Origin");
+    if (!requestOrigin) {
+      return defaultOrigin;
+    }
     const authorizedOrigins =
       project?.originURL?.split(",").map((origin) => origin.trim()) || [];
 
