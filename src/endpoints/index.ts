@@ -209,6 +209,10 @@ endpoints
     c.header("Cache-Control", "no-store");
     c.header("Vary", "Origin");
 
+    console.log(
+      JSON.stringify({ project: project?.clientID, url: c.req.raw.url }),
+    );
+
     const allowOrigin = toAuthorizeOrigin({
       request: c.req.raw,
       project,
@@ -1583,7 +1587,9 @@ endpoints
     // 2. Générer les options pour le navigateur
     const options = await generateRegistrationOptions({
       rpName: project.clientID.replaceAll("_", " "),
-      rpID: new URL(project.originURL!).hostname,
+      rpID: new URL(
+        toAuthorizeOrigin({ request: c.req.raw, project, defaultOrigin: "*" }),
+      ).hostname,
       userID: new Uint8Array(new TextEncoder().encode(userInfo.id)),
       userName: userDisplayName,
       userDisplayName: userDisplayName,
@@ -1644,7 +1650,13 @@ endpoints
         response,
         expectedChallenge,
         expectedOrigin: project.originURL!,
-        expectedRPID: new URL(project.originURL!).hostname,
+        expectedRPID: new URL(
+          toAuthorizeOrigin({
+            request: c.req.raw,
+            project,
+            defaultOrigin: "*",
+          }),
+        ).hostname,
       });
     } catch (error) {
       return c.json({ error: (error as Error).message }, 400);
@@ -1793,11 +1805,10 @@ endpoints.use(
  */
 endpoints.options("*", (c) => {
   const project = c.get("project") as Project | undefined;
-  console.log(project);
   const allowOrigin = toAuthorizeOrigin({
     request: c.req.raw,
     project,
-    defaultOrigin: "*",
+    defaultOrigin: c.env.WEBUI_ORIGIN_URL,
   });
 
   return c.text("ok", 200, {
@@ -1853,7 +1864,9 @@ endpoints.all("*", async (c) => {
 
       if (!project?.originURL) return false;
 
-      const projectUrl = new URL(project.originURL);
+      const projectUrl = new URL(
+        toAuthorizeOrigin({ request: c.req.raw, project, defaultOrigin: "" }),
+      );
 
       // Enforce HTTPS when project URL uses HTTPS (prevent downgrade attacks)
       if (
