@@ -204,7 +204,7 @@ endpoints
       }
     }),
   )
-  .use("*", (c, next) => {
+  .use("*", async (c, next) => {
     const project = c.get("project") as Project | undefined;
     c.header("Cache-Control", "no-store");
     c.header("Vary", "Origin");
@@ -214,7 +214,6 @@ endpoints
       project,
       defaultOrigin: c.env.WEBUI_ORIGIN_URL,
     });
-
     return cors({
       origin: allowOrigin,
       allowHeaders: [
@@ -1795,8 +1794,14 @@ endpoints.use(
 endpoints.options("*", (c) => {
   const project = c.get("project") as Project | undefined;
   console.log(project);
+  const allowOrigin = toAuthorizeOrigin({
+    request: c.req.raw,
+    project,
+    defaultOrigin: "*",
+  });
+
   return c.text("ok", 200, {
-    "Access-Control-Allow-Origin": project?.originURL || "*",
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, PATCH, OPTIONS, DELETE, POST",
     "Access-Control-Allow-Headers":
       "Content-Type, Authorization, x-elevated-token",
