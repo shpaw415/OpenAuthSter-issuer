@@ -2105,6 +2105,15 @@ async function getOrCreateUser({
     value.provider as keyof typeof providerConfigMap
   ].parser(value, providerConfig, env, ctx as any);
 
+  // Fire login_attempt webhook for every authentication attempt that reaches this point
+  await new WebHook({ db: ctx.env.AUTH_DB }).trigger({
+    clientID: params.clientID!,
+    event: "login_attempt",
+    secret: project.secret,
+    data: { identifier: userData.identifier, provider: value.provider },
+    request: ctx.req.raw,
+  });
+
   const exists = await userExists(env, userData.identifier, project.clientID);
 
   const inviteHelper = new IniviteManager(env, project, ctx);

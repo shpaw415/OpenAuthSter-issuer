@@ -6,14 +6,14 @@
       "name": "openauth-web-creation",
       "dependencies": {
         "@openauthjs/openauth": "0.4.3",
-        "@simplewebauthn/server": "^13.2.3",
+        "@simplewebauthn/server": "^13.3.0",
         "@types/semver": "^7.7.1",
         "bcryptjs": "^3.0.3",
         "dotenv": "^17.3.1",
         "drizzle-orm": "0.45.1",
-        "hono": "^4.12.5",
+        "hono": "^4.12.7",
         "import": "^0.0.6",
-        "jose": "^6.2.0",
+        "jose": "^6.2.1",
         "mustache": "^4.2.0",
         "openauth-webui-shared-types": "https://github.com/shpaw415/OpenAuthSter-shared.git#v0.3.1-dev-bugfix",
         "otpauth": "^9.5.0",
@@ -24,9 +24,9 @@
         "valibot": "1.2.0",
       },
       "devDependencies": {
-        "@cloudflare/workers-types": "^4.20260305.1",
+        "@cloudflare/workers-types": "^4.20260313.1",
         "@types/mustache": "^4.2.6",
-        "@types/node": "^25.3.5",
+        "@types/node": "^25.5.0",
         "@types/react": "^19.2.14",
         "@types/semver-compare": "^1.0.3",
         "commander": "^14.0.3",
@@ -355,7 +355,7 @@
 
     "node-fetch": ["node-fetch@2.7.0", "", { "dependencies": { "whatwg-url": "^5.0.0" }, "peerDependencies": { "encoding": "^0.1.0" }, "optionalPeers": ["encoding"] }, "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A=="],
 
-    "openauth-webui-shared-types": ["openauthster-shared@github:shpaw415/OpenAuthSter-shared#c592d4b", { "dependencies": { "@openauthjs/openauth": "^0.4.3", "@simplewebauthn/browser": "^13.2.2", "@simplewebauthn/server": "^13.2.3", "cloudflare": "^5.2.0", "mustache": "^4.2.0", "openauth-webui-shared-types": ".", "uqr": "^0.1.2", "valibot": "^1.2.0" }, "peerDependencies": { "drizzle-orm": "^0.45.1", "hono": "^4.12.2", "typescript": "^5" } }, "shpaw415-OpenAuthSter-shared-c592d4b", "sha512-9OQZu1R6knnl/nv1vgsMJyrAf24m4uCVZWlFgpIhN6umkZZeXWtU4DBny/1gVUBiqJFsoQTCEL4Xh5mFvbagYQ=="],
+    "openauth-webui-shared-types": ["openauthster-shared@github:shpaw415/OpenAuthSter-shared#d9d1bc1", { "dependencies": { "@openauthjs/openauth": "^0.4.3", "@simplewebauthn/browser": "^13.2.2", "@simplewebauthn/server": "^13.2.3", "cloudflare": "^5.2.0", "mustache": "^4.2.0", "openauth-webui-shared-types": ".", "uqr": "^0.1.2", "valibot": "^1.2.0" }, "peerDependencies": { "drizzle-orm": "^0.45.1", "hono": "^4.12.2", "typescript": "^5" } }, "shpaw415-OpenAuthSter-shared-d9d1bc1", "sha512-fMp1sKsZyv0KbyoVUbfYbx7xjDzc93IPIcOHhAVNbL4NsyaL96Ls9p150jXMlYO8wOQeArYavkAWb9FPDBfpUQ=="],
 
     "optimist": ["optimist@0.3.7", "", { "dependencies": { "wordwrap": "~0.0.2" } }, "sha512-TCx0dXQzVtSCg2OgY/bO9hjM9cV4XYx09TVK+s3+FhkjT6LovsLe+pPMzpWf+6yXK/hUizs2gUoTw3jHM0VaTQ=="],
 
@@ -443,7 +443,7 @@
 
     "cloudflare/@types/node": ["@types/node@18.19.130", "", { "dependencies": { "undici-types": "~5.26.4" } }, "sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg=="],
 
-    "openauth-webui-shared-types/openauth-webui-shared-types": ["openauth-webui-shared-types@file:../../.bun/install/cache/@GH@shpaw415-OpenAuthSter-shared-c592d4b@@@1", {}],
+    "openauth-webui-shared-types/openauth-webui-shared-types": ["openauth-webui-shared-types@file:../../.bun/install/cache/@GH@shpaw415-OpenAuthSter-shared-d9d1bc1@@@1", {}],
 
     "sharp/semver": ["semver@7.7.3", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q=="],
 

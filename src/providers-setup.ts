@@ -16,6 +16,7 @@ import type {
   Project,
   ProviderConfig,
   ProviderType,
+  QRProviderConfig,
   SlackProviderConfig,
 } from "openauth-webui-shared-types";
 import { parseDBCopyTemplate } from "openauth-webui-shared-types";
@@ -1089,7 +1090,7 @@ const yahooBuilder: ConfigType<
 // QR code Provider /////////////////////////////
 
 const qrBuilder: ConfigType<
-  ProviderConfig,
+  QRProviderConfig,
   QRProviderOnSuccessData,
   QRProviderOnSuccessData
 > = {
@@ -1109,7 +1110,6 @@ const qrBuilder: ConfigType<
     return QRProvider(
       QrUI({
         issuerURI: new URL(ctx.req.url).origin,
-        appURI: project.originURL,
         binding: env.QR_AUTH_DO,
         copy: await getCopyTemplateFromId<"qr">(copyTemplateId ?? null, env),
         client_id: project.clientID,
