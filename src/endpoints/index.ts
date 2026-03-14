@@ -1664,7 +1664,11 @@ endpoints
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge,
-        expectedOrigin: project.originURL!,
+        expectedOrigin: toAuthorizeOrigin({
+          request: c.req.raw,
+          project,
+          defaultOrigin: "*",
+        }),
         expectedRPID: new URL(
           toAuthorizeOrigin({
             request: c.req.raw,
