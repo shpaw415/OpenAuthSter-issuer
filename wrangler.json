@@ -22,7 +22,8 @@
     {
       "binding": "AUTH_DB",
       "database_id": "ed2717d1-ed2f-4c4b-9e3b-219fde9b320a",
-      "remote": true
+      "remote": true,
+      "migrations_dir": "drizzle/migrations"
     }
   ],
   "observability": {

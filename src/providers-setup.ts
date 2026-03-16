@@ -251,10 +251,15 @@ export async function sendTwilioSMS({
   return res.json();
 }
 
-async function getCopyTemplateFromId<T extends keyof CopyDataSelection>(
-  id: string | null,
-  env: Env,
-): Promise<CopyDataSelection[T] | undefined> {
+async function getCopyTemplateFromId<T extends keyof CopyDataSelection>({
+  id,
+  env,
+  provider,
+}: {
+  id: string | null;
+  env: Env;
+  provider: T;
+}): Promise<CopyDataSelection[T] | undefined> {
   if (!id) return undefined;
   const template = await drizzle(env.AUTH_DB)
     .select()
@@ -263,7 +268,7 @@ async function getCopyTemplateFromId<T extends keyof CopyDataSelection>(
     .limit(1)
     .get();
   if (!template) return undefined;
-  return parseDBCopyTemplate<CopyDataSelection[T]>(template).copyData;
+  return parseDBCopyTemplate(template).copyData[provider];
 }
 
 function OAuth2Fetcher<UserInfo>(
@@ -317,10 +322,11 @@ const passwordConfigBuilder: ConfigType<
               });
             }
           },
-          copy: await getCopyTemplateFromId<"password">(
-            copyTemplateId ?? null,
+          copy: await getCopyTemplateFromId({
+            id: copyTemplateId ?? null,
             env,
-          ),
+            provider: "password",
+          }),
           validatePassword(password) {
             const {
               minLength,
@@ -404,10 +410,11 @@ const codeConfigBuilder: ConfigType<
   { email?: string; phone?: string }
 > = {
   provider: async ({ env, globalConfig, project, copyTemplateId, ctx }) => {
-    const copyData = await getCopyTemplateFromId<"code">(
-      copyTemplateId ?? null,
+    const copyData = await getCopyTemplateFromId({
+      id: copyTemplateId ?? null,
       env,
-    );
+      provider: "code",
+    });
     const codeUI = (await import("@openauthjs/openauth/ui/code")).CodeUI({
       copy: copyData,
       mode: project.codeMode,
@@ -1111,7 +1118,11 @@ const qrBuilder: ConfigType<
       QrUI({
         issuerURI: new URL(ctx.req.url).origin,
         binding: env.QR_AUTH_DO,
-        copy: await getCopyTemplateFromId<"qr">(copyTemplateId ?? null, env),
+        copy: await getCopyTemplateFromId({
+          id: copyTemplateId ?? null,
+          provider: "qr",
+          env,
+        }),
         client_id: project.clientID,
         //@ts-ignore
         issuer: issuer,
@@ -1144,10 +1155,11 @@ const passkeyBuilder: ConfigType<ProviderConfig, { identifier: string }, {}> = {
 
     return mod.WebAuthnProvider({
       UI: mod.PassKeyUI({
-        copy: await getCopyTemplateFromId<"passkey">(
-          copyTemplateId ?? null,
+        copy: await getCopyTemplateFromId({
+          id: copyTemplateId ?? null,
+          provider: "passkey",
           env,
-        ),
+        }),
       }),
       db: env.AUTH_DB,
       origin: autorizedOrigin,

@@ -6,7 +6,12 @@
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "moduleResolution": "bundler",
-    "types": ["./worker-configuration.d.ts", "./types.d.ts", "@types/node"],
+    "types": [
+      "./worker-configuration.d.ts",
+      "./types.d.ts",
+      "@types/node",
+      "@types/bun"
+    ],
     "noEmit": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
@@ -14,5 +19,5 @@
     "skipLibCheck": true,
     "strict": true
   },
-  "include": ["src", "./openauth.config.ts"]
+  "include": ["src", "./openauth.config.ts", "bin"]
 }
