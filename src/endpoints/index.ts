@@ -372,9 +372,9 @@ endpoints
         responseInit: {
           body: JSON.stringify({
             success: false,
-            data: null,
+            data: null as any,
             error: err instanceof Error ? err.message : String(err),
-          } satisfies UserResponseSchemaType),
+          } satisfies UserResponseSchemaType<any, any, any>),
         },
       });
     }
@@ -425,7 +425,7 @@ endpoints
         responseInit: {
           body: JSON.stringify({
             success: false,
-            data: null,
+            data: null as any,
             error: err instanceof Error ? err.message : String(err),
           } satisfies UserResponseSchemaType),
         },
@@ -447,7 +447,7 @@ endpoints
       return c.json(
         {
           success: true,
-          data: null,
+          data: null as any,
           error: null,
         } satisfies UserResponseSchemaType,
         200,
@@ -465,7 +465,7 @@ endpoints
         responseInit: {
           body: JSON.stringify({
             success: false,
-            data: null,
+            data: null as any,
             error: err instanceof Error ? err.message : String(err),
           } satisfies UserResponseSchemaType),
         },
@@ -507,7 +507,7 @@ endpoints.get("/users/:clientID", async (c) => {
         body: JSON.stringify({
           success: false,
           error: err instanceof Error ? err.message : String(err),
-          data: null,
+          data: null as any,
         } satisfies UserResponseSchemaType),
       },
     });
@@ -709,7 +709,7 @@ endpoints
           responseInit: {
             body: JSON.stringify({
               success: false,
-              data: null,
+              data: null as any,
               error: responseData.error || "Failed to fetch user data",
             } satisfies UserResponseSchemaType),
           },
@@ -750,7 +750,7 @@ endpoints
           responseInit: {
             body: JSON.stringify({
               success: false,
-              data: null,
+              data: null as any,
               error: updateResult.error || "Failed to update user data",
             } satisfies UserResponseSchemaType),
           },
@@ -792,7 +792,7 @@ endpoints
           responseInit: {
             body: JSON.stringify({
               success: false,
-              data: null,
+              data: null as any,
               error: updateResult.error || "Failed to delete user data",
             } satisfies UserResponseSchemaType),
           },
@@ -1840,11 +1840,7 @@ endpoints.options("*", (c) => {
 
 endpoints.all("*", async (c) => {
   const params: Params = c.get("params");
-  const project = await getProject({
-    id: params.clientID!,
-    env: c.env,
-    ctx: c,
-  });
+  const project: Project = c.get("project");
   const getTheme = () => {
     const isWellKnown = new URL(c.req.raw.url).pathname.startsWith(
       "/.well-known",
@@ -1996,7 +1992,8 @@ async function getProjectById(
 ): Promise<null | Project> {
   if (clientId === PUBLIC_CLIENT_ID) {
     return {
-      themeId: null,
+      theme_id: null,
+      owner_id: "admin",
       emailTemplateId: null,
       projectData: undefined as any,
       active: true,
@@ -2061,13 +2058,18 @@ async function getProjectByHost(url: URL, env: Env): Promise<null | Project> {
 }
 
 async function getThemeFromProject(project: Project, env: Env): Promise<Theme> {
-  if (!project.themeId) {
+  if (!project.theme_id) {
     return DefaultTheme;
   }
   return drizzle(env.AUTH_DB)
     .select()
     .from(uiStyleTable)
-    .where(eq(uiStyleTable.id, project.themeId))
+    .where(
+      and(
+        eq(uiStyleTable.id, project.theme_id),
+        eq(uiStyleTable.owner_id, project.owner_id),
+      ),
+    )
     .limit(1)
     .get()
     .then((el) => {

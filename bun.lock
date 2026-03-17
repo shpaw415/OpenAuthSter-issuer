@@ -360,7 +360,7 @@
 
     "node-fetch": ["node-fetch@2.7.0", "", { "dependencies": { "whatwg-url": "^5.0.0" }, "peerDependencies": { "encoding": "^0.1.0" }, "optionalPeers": ["encoding"] }, "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A=="],
 
-    "openauth-webui-shared-types": ["openauthster-shared@github:shpaw415/OpenAuthSter-shared#0b15971", { "dependencies": { "@openauthjs/openauth": "^0.4.3", "@simplewebauthn/browser": "^13.2.2", "@simplewebauthn/server": "^13.2.3", "cloudflare": "^5.2.0", "mustache": "^4.2.0", "openauth-webui-shared-types": ".", "uqr": "^0.1.2", "valibot": "^1.2.0" }, "peerDependencies": { "drizzle-orm": "^0.45.1", "hono": "^4.12.2", "typescript": "^5" } }, "shpaw415-OpenAuthSter-shared-0b15971", "sha512-8Go1QHE88P7lksFgDqkhdl64j5ZBISBN0HuOxy5sD0NaI2b4OJeAS+HbQTCpyiEP3Yojj7oEWDcazuXwe1oyrQ=="],
+    "openauth-webui-shared-types": ["openauthster-shared@github:shpaw415/OpenAuthSter-shared#d434b77", { "dependencies": { "@openauthjs/openauth": "^0.4.3", "@simplewebauthn/browser": "^13.2.2", "@simplewebauthn/server": "^13.2.3", "cloudflare": "^5.2.0", "mustache": "^4.2.0", "openauth-webui-shared-types": ".", "uqr": "^0.1.2", "valibot": "^1.2.0" }, "peerDependencies": { "drizzle-orm": "^0.45.1", "hono": "^4.12.2", "typescript": "^5" } }, "shpaw415-OpenAuthSter-shared-d434b77", "sha512-yKcmOiWuZf2PS1MV0Eu2VSeOC67M2wmWfVs95RG8K9QtWnrvo9ba+zL2kkDSpnhf+qEMi0a+T6/w62cPfyMXiQ=="],
 
     "optimist": ["optimist@0.3.7", "", { "dependencies": { "wordwrap": "~0.0.2" } }, "sha512-TCx0dXQzVtSCg2OgY/bO9hjM9cV4XYx09TVK+s3+FhkjT6LovsLe+pPMzpWf+6yXK/hUizs2gUoTw3jHM0VaTQ=="],
 
@@ -448,7 +448,7 @@
 
     "cloudflare/@types/node": ["@types/node@18.19.130", "", { "dependencies": { "undici-types": "~5.26.4" } }, "sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg=="],
 
-    "openauth-webui-shared-types/openauth-webui-shared-types": ["openauth-webui-shared-types@file:../../.bun/install/cache/@GH@shpaw415-OpenAuthSter-shared-0b15971@@@1", {}],
+    "openauth-webui-shared-types/openauth-webui-shared-types": ["openauth-webui-shared-types@file:../../.bun/install/cache/@GH@shpaw415-OpenAuthSter-shared-d434b77@@@1", {}],
 
     "sharp/semver": ["semver@7.7.3", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q=="],
 
