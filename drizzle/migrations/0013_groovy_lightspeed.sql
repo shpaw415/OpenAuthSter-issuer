@@ -1,0 +1,1 @@
+ALTER TABLE `openauth_webui_projects` ADD `name` text DEFAULT 'Project Name' NOT NULL;

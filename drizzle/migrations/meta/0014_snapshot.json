@@ -1,8 +1,8 @@
 {
 	"version": "6",
 	"dialect": "sqlite",
-	"id": "c46a9700-02c6-43d9-a79c-4993d8b93b43",
-	"prevId": "d8cbb12f-1989-4f8f-87d9-0fa749a46bc4",
+	"id": "23a48cf2-d12c-4717-868a-8fb29a0372e3",
+	"prevId": "405aade4-7222-46a3-9dcb-1c5de01932ca",
 	"tables": {
 		"openauth_webui_logs": {
 			"name": "openauth_webui_logs",
@@ -51,7 +51,17 @@
 				}
 			},
 			"indexes": {},
-			"foreignKeys": {},
+			"foreignKeys": {
+				"openauth_webui_logs_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_webui_logs_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_webui_logs",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}
@@ -110,7 +120,17 @@
 				}
 			},
 			"indexes": {},
-			"foreignKeys": {},
+			"foreignKeys": {
+				"openauth_webui_webhooks_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_webui_webhooks_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_webui_webhooks",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}
@@ -139,8 +159,15 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"owner": {
-					"name": "owner",
+				"owner_id": {
+					"name": "owner_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"owner_group_id": {
+					"name": "owner_group_id",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true,
@@ -207,7 +234,17 @@
 				}
 			},
 			"indexes": {},
-			"foreignKeys": {},
+			"foreignKeys": {
+				"openauth_webui_invite_links_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_webui_invite_links_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_webui_invite_links",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}
@@ -250,6 +287,13 @@
 					"notNull": false,
 					"autoincrement": false
 				},
+				"role": {
+					"name": "role",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
 				"created_at": {
 					"name": "created_at",
 					"type": "text",
@@ -266,6 +310,162 @@
 				}
 			},
 			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"openauth_webui_copy_template_invites": {
+			"name": "openauth_webui_copy_template_invites",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"template_id": {
+					"name": "template_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"clientID": {
+					"name": "clientID",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"code": {
+					"name": "code",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"expiresAt": {
+					"name": "expiresAt",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"openauth_webui_copy_template_invites_template_id_openauth_webui_email_templates_id_fk": {
+					"name": "openauth_webui_copy_template_invites_template_id_openauth_webui_email_templates_id_fk",
+					"tableFrom": "openauth_webui_copy_template_invites",
+					"tableTo": "openauth_webui_email_templates",
+					"columnsFrom": ["template_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"openauth_webui_copy_template_invites_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_webui_copy_template_invites_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_webui_copy_template_invites",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"openauth_webui_email_template_invites": {
+			"name": "openauth_webui_email_template_invites",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"template_id": {
+					"name": "template_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"clientID": {
+					"name": "clientID",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"code": {
+					"name": "code",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"expiresAt": {
+					"name": "expiresAt",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"openauth_webui_email_template_invites_template_id_openauth_webui_email_templates_id_fk": {
+					"name": "openauth_webui_email_template_invites_template_id_openauth_webui_email_templates_id_fk",
+					"tableFrom": "openauth_webui_email_template_invites",
+					"tableTo": "openauth_webui_email_templates",
+					"columnsFrom": ["template_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"openauth_webui_email_template_invites_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_webui_email_template_invites_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_webui_email_template_invites",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}
@@ -301,8 +501,15 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"owner": {
-					"name": "owner",
+				"owner_id": {
+					"name": "owner_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"owner_group_id": {
+					"name": "owner_group_id",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true,
@@ -329,6 +536,68 @@
 			"uniqueConstraints": {},
 			"checkConstraints": {}
 		},
+		"openauth_webui_project_invites": {
+			"name": "openauth_webui_project_invites",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"clientID": {
+					"name": "clientID",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"user_id": {
+					"name": "user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"code": {
+					"name": "code",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"expiresAt": {
+					"name": "expiresAt",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"openauth_webui_project_invites_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_webui_project_invites_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_webui_project_invites",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
 		"openauth_webui_projects": {
 			"name": "openauth_webui_projects",
 			"columns": {
@@ -339,8 +608,23 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"created_at": {
-					"name": "created_at",
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'Project Name'"
+				},
+				"owner_id": {
+					"name": "owner_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"owner_group_id": {
+					"name": "owner_group_id",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true,
@@ -362,9 +646,9 @@
 					"autoincrement": false,
 					"default": "'[]'"
 				},
-				"themeId": {
-					"name": "themeId",
-					"type": "text",
+				"theme_id": {
+					"name": "theme_id",
+					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
@@ -426,10 +710,27 @@
 					"primaryKey": false,
 					"notNull": true,
 					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
 				}
 			},
 			"indexes": {},
-			"foreignKeys": {},
+			"foreignKeys": {
+				"openauth_webui_projects_theme_id_openauth_webui_ui_styles_id_fk": {
+					"name": "openauth_webui_projects_theme_id_openauth_webui_ui_styles_id_fk",
+					"tableFrom": "openauth_webui_projects",
+					"tableTo": "openauth_webui_ui_styles",
+					"columnsFrom": ["theme_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}
@@ -482,7 +783,17 @@
 				}
 			},
 			"indexes": {},
-			"foreignKeys": {},
+			"foreignKeys": {
+				"openauth_totp_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_totp_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_totp",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}
@@ -527,7 +838,17 @@
 				}
 			},
 			"indexes": {},
-			"foreignKeys": {},
+			"foreignKeys": {
+				"openauth_totp_tokens_clientID_openauth_webui_projects_clientID_fk": {
+					"name": "openauth_totp_tokens_clientID_openauth_webui_projects_clientID_fk",
+					"tableFrom": "openauth_totp_tokens",
+					"tableTo": "openauth_webui_projects",
+					"columnsFrom": ["clientID"],
+					"columnsTo": ["clientID"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}
@@ -549,8 +870,8 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"owner": {
-					"name": "owner",
+				"owner_id": {
+					"name": "owner_id",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true,

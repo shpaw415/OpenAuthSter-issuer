@@ -1,47 +1,53 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "compatibility_date": "2026-01-27",
-  "main": "src/index.ts",
-  "name": "openauthster-issuer",
-  "upload_source_maps": true,
-  "d1_databases": [
-    {
-      "binding": "AUTH_DB",
-      "database_name": "<YOUR_D1_DATABASE_NAME>",
-      "database_id": "<YOUR_D1_DATABASE_ID>",
-      "migrations_dir": "drizzle/migrations",
-      "remote": true,
-    },
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "QR_AUTH_DO",
-        "class_name": "QRHandshake",
-      },
-    ],
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["QRHandshake"],
-    },
-  ],
-  "observability": {
-    "enabled": true,
-  },
-  "compatibility_flags": ["nodejs_compat"],
-  "vars": {
-    // Comma-separated list of admin emails for the WebUI.
-    "WEBUI_ADMIN_EMAILS": "email1@example.com,email2@example.com",
-    // The origin URL of your WebUI, used for CORS and redirects.
-    "WEBUI_ORIGIN_URL": "https://your-webui-domain.com",
-    // The URL of your OpenAuthster.
-    "ISSUER_URL": "https://your-issuer-domain.com",
-    // Enable or disable verbose logging (set to "true" to enable).
-    // Enable in development or when troubleshooting, but disable in production for better performance.
-    "LOG_ENABLED": "false",
-    "ACCESS_TTL": "900", // Access token time-to-live in seconds (e.g., 900 seconds = 15 minutes)
-    "REFRESH_TTL": "604800", // Refresh token time-to-live in seconds (e.g., 604800 seconds = 7 days)
-  },
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2026-01-27",
+	"main": "src/index.ts",
+	"name": "openauthster-issuer",
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "AUTH_DB",
+			"database_name": "<YOUR_D1_DATABASE_NAME>",
+			"database_id": "<YOUR_D1_DATABASE_ID>",
+			"migrations_dir": "drizzle/migrations",
+			"remote": true
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "QR_AUTH_DO",
+				"class_name": "QRHandshake"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["QRHandshake"]
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		// Comma-separated list of admin emails for the WebUI.
+		"WEBUI_ADMIN_EMAILS": "email1@example.com,email2@example.com",
+		// The origin URL of your WebUI, used for CORS and redirects.
+		"WEBUI_ORIGIN_URL": "https://your-webui-domain.com",
+		// A secret key for securing WebUI sessions and API requests.
+		// This should be a long, random string and kept confidential.
+		// for enhance security, set this value using a secure method in production,
+		// such as environment variables or a secrets manager, rather than hardcoding it in your configuration file.
+		// must be the same as the "secret" value used when creating the OpenAuthster webui
+		"WEBUI_SECRET": "your-webui-secret",
+		// The URL of your OpenAuthster.
+		"ISSUER_URL": "https://your-issuer-domain.com",
+		// Enable or disable verbose logging (set to "true" to enable).
+		// Enable in development or when troubleshooting, but disable in production for better performance.
+		"LOG_ENABLED": "false",
+		"ACCESS_TTL": "900", // Access token time-to-live in seconds (e.g., 900 seconds = 15 minutes)
+		"REFRESH_TTL": "604800" // Refresh token time-to-live in seconds (e.g., 604800 seconds = 7 days)
+	}
 }

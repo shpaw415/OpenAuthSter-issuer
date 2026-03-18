@@ -1,144 +1,140 @@
-import { Command } from "commander";
-import { version } from "../package.json";
 import { exec } from "child_process";
+import { Command } from "commander";
 import { createInterface } from "readline";
+import packageJson, { version } from "../package.json";
 import { initializeFlow } from "./initFlow";
 import { upgradeFlow } from "./upgradeFlow";
-import packageJson from "../package.json";
 
 const execSync = async (
-  command: string,
+	command: string,
 ): Promise<{ stdout: string; stderr: string }> => {
-  const res = Bun.spawnSync(command.split(" "));
-  return { stdout: res.stdout.toString(), stderr: res.stderr.toString() };
+	const res = Bun.spawnSync(command.split(" "));
+	return { stdout: res.stdout.toString(), stderr: res.stderr.toString() };
 };
 
 const program = new Command();
 
 program
-  .name("openauth-multitenant-server-cli")
-  .description("CLI for OpenAuth Multitenant Server")
-  .version(version);
+	.name("openauth-multitenant-server-cli")
+	.description("CLI for OpenAuth Multitenant Server")
+	.version(version);
 
 program
-  .command("upgrade")
-  .description("Upgrade the OpenAuth Multitenant Server")
-  .option(
-    "-v, --version <version>",
-    "Specify the version to update to",
-    "latest",
-  )
-  .action(async (options) => {
-    const targetVersion =
-      options.version === "latest" ? "main" : options.version;
-    await upgradeFlow(
-      {
-        version: targetVersion,
-        deploy:
-          //@ts-ignore
-          (packageJson.deploy_method as "wrangler" | "git" | undefined) ??
-          "wrangler",
-      },
-      {
-        exec: execSync,
-        checkBinary: checkBinaryExists,
-        exit: (code) => process.exit(code),
-        log: console.log,
-        error: console.error,
-      },
-    );
-  });
+	.command("upgrade")
+	.description("Upgrade the OpenAuth Multitenant Server")
+	.option(
+		"-v, --version <version>",
+		"Specify the version to update to",
+		"latest",
+	)
+	.action(async (options) => {
+		const targetVersion =
+			options.version === "latest" ? "main" : options.version;
+		await upgradeFlow(
+			{
+				version: targetVersion,
+				deploy:
+					//@ts-expect-error
+					(packageJson.deploy_method as "wrangler" | "git" | undefined) ??
+					"wrangler",
+			},
+			{
+				exec: execSync,
+				checkBinary: checkBinaryExists,
+				exit: (code) => process.exit(code),
+				log: console.log,
+				error: console.error,
+			},
+		);
+	});
 
 program
-  .command("initialize")
-  .option("-r, --repo <repo>", "Git repository URL for git initialization")
-  .description("Initialize the OpenAuth Multitenant Server")
-  .action(async () => {
-    await initializeFlow(
-      {
-        exec: execSync,
-        checkBinary: checkBinaryExists,
-        readFile: (path) => Bun.file(path).text(),
-        fileExists: (path) => Bun.file(path).exists(),
-        writeFile: (path, content) => Bun.write(path, content).then(() => {}),
-        parseJSONC: (content) =>
-          Bun.JSONC.parse(content) as Record<string, unknown>,
-        promptVars: async (vars) => {
-          const rl = createInterface({
-            input: process.stdin,
-            output: process.stdout,
-          });
-          const result: Record<string, string> = {};
-          for (const [key, placeholder] of Object.entries(vars)) {
-            result[key] = await new Promise((resolve) => {
-              rl.question(`  ${key} [${placeholder}]: `, (answer) =>
-                resolve(answer.trim() || placeholder),
-              );
-            });
-          }
-          rl.close();
-          return result;
-        },
-        exit: (code) => process.exit(code),
-        log: console.log,
-        error: console.error,
-      },
-      {},
-    );
-  });
+	.command("initialize")
+	.option("-r, --repo <repo>", "Git repository URL for git initialization")
+	.description("Initialize the OpenAuth Multitenant Server")
+	.action(async () => {
+		await initializeFlow(
+			{
+				exec: execSync,
+				checkBinary: checkBinaryExists,
+				readFile: (path) => Bun.file(path).text(),
+				fileExists: (path) => Bun.file(path).exists(),
+				writeFile: (path, content) => Bun.write(path, content).then(() => {}),
+				parseJSONC: (content) =>
+					Bun.JSONC.parse(content) as Record<string, unknown>,
+				promptVars: async (vars) => {
+					const rl = createInterface({
+						input: process.stdin,
+						output: process.stdout,
+					});
+					const result: Record<string, string> = {};
+					for (const [key, placeholder] of Object.entries(vars)) {
+						result[key] = await new Promise((resolve) => {
+							rl.question(`  ${key} [${placeholder}]: `, (answer) =>
+								resolve(answer.trim() || placeholder),
+							);
+						});
+					}
+					rl.close();
+					return result;
+				},
+				exit: (code) => process.exit(code),
+				log: console.log,
+				error: console.error,
+			},
+			{},
+		);
+	});
 
 program
-  .command("deploy")
-  .description("Deploy the OpenAuth Multitenant Server")
-  .action(async () => {
-    const deployMethod =
-      (packageJson as { deploy_method?: "git" | "wrangler" }).deploy_method ||
-      "wrangler";
+	.command("deploy")
+	.description("Deploy the OpenAuth Multitenant Server")
+	.action(async () => {
+		const deployMethod =
+			(packageJson as { deploy_method?: "git" | "wrangler" }).deploy_method ||
+			"wrangler";
 
-    if (deployMethod === "wrangler") {
-      const deploymentRes = await execSync(`wrangler deploy`);
-      if (deploymentRes.stderr) {
-        console.error("Error deploying with wrangler:", deploymentRes.stderr);
-      } else {
-        console.log("Deployment successful!: ", deploymentRes.stdout);
-      }
-    } else if (deployMethod === "git") {
-      console.log(await execSync("git add ."));
-      console.log(
-        Bun.spawnSync([
-          "git",
-          "commit",
-          "-m",
-          `"Deploying version ${packageJson.version} at: ${new Date().toLocaleDateString()}"`,
-        ]).stdout.toString("utf8"),
-      );
-      const deployRes = await execSync(`git push cloudflare main`);
-      if (
-        deployRes.stderr &&
-        deployRes.stderr.toLowerCase().includes("error")
-      ) {
-        console.error("Error pushing to git:", deployRes.stderr);
-        process.exit(1);
-      } else {
-        console.log("Deployment successful!: ", deployRes.stdout);
-        console.log(
-          "go to your cloudflare dashboard to see the deployment status",
-        );
-      }
-    } else {
-      console.error(
-        "Invalid deployment method specified in package.json. Please set deploy_method to either 'wrangler' or 'git'.",
-      );
-      process.exit(1);
-    }
-  });
+		if (deployMethod === "wrangler") {
+			const deploymentRes = await execSync(`wrangler deploy`);
+			if (deploymentRes.stderr) {
+				console.error("Error deploying with wrangler:", deploymentRes.stderr);
+			} else {
+				console.log("Deployment successful!: ", deploymentRes.stdout);
+			}
+		} else if (deployMethod === "git") {
+			console.log(await execSync("git add ."));
+			console.log(
+				Bun.spawnSync([
+					"git",
+					"commit",
+					"-m",
+					`"Deploying version ${packageJson.version} at: ${new Date().toLocaleDateString()}"`,
+				]).stdout.toString("utf8"),
+			);
+			const deployRes = await execSync(`git push cloudflare main`);
+			if (deployRes.stderr.toLowerCase().includes("error")) {
+				console.error("Error pushing to git:", deployRes.stderr);
+				process.exit(1);
+			} else {
+				console.log("Deployment successful!: ", deployRes.stdout);
+				console.log(
+					"go to your cloudflare dashboard to see the deployment status",
+				);
+			}
+		} else {
+			console.error(
+				"Invalid deployment method specified in package.json. Please set deploy_method to either 'wrangler' or 'git'.",
+			);
+			process.exit(1);
+		}
+	});
 
 function checkBinaryExists(binary: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    exec(`which ${binary}`, (error) => {
-      resolve(!error);
-    });
-  });
+	return new Promise((resolve) => {
+		exec(`which ${binary}`, (error) => {
+			resolve(!error);
+		});
+	});
 }
 
 program.parse(process.argv);
