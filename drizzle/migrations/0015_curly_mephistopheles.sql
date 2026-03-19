@@ -1,0 +1,1 @@
+ALTER TABLE `openauth_webui_ui_styles` ADD `owner_group_id` text NOT NULL;

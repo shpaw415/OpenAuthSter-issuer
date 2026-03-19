@@ -1,7 +1,7 @@
 // Hono imports
 
 import { env } from "cloudflare:workers";
-import { issuer } from "@kagii/openauth";
+import { issuer } from "@kagii/openauth/issuer";
 import type { Provider } from "@kagii/openauth/provider/provider";
 import { D1Storage } from "@kagii/openauth/storage/d1";
 // OpenAuth imports
