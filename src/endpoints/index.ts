@@ -164,8 +164,6 @@ endpoints
 			const params = await requestToParams(c.req.raw, c.env);
 			c.set("params", params);
 
-			//if (c.req.raw.url.startsWith("/.well-known/")) return next(); // skip CORS for well-known endpoints
-
 			const { clientID, copyID, inviteID } = params;
 			log({
 				cookies: { clientID, copyID, inviteID },
@@ -2037,7 +2035,7 @@ async function getProjectById(
 			created_at: new Date().toISOString(),
 			codeMode: "email",
 			registerOnInvite: false,
-			secret: "",
+			secret: env.WEBUI_SECRET,
 			authEndpointURL: "",
 			cloudflareDomaineID: "",
 			originURL: env.WEBUI_ORIGIN_URL,
