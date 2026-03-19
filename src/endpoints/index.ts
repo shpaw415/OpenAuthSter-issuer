@@ -164,7 +164,7 @@ endpoints
 			const params = await requestToParams(c.req.raw, c.env);
 			c.set("params", params);
 
-			if (c.req.raw.url.startsWith("/.well-known/")) return next(); // skip CORS for well-known endpoints
+			//if (c.req.raw.url.startsWith("/.well-known/")) return next(); // skip CORS for well-known endpoints
 
 			const { clientID, copyID, inviteID } = params;
 			log({
@@ -1878,11 +1878,11 @@ endpoints.all("*", async (c) => {
 		ttl: {
 			access: parseInt(
 				(c.env as Env & { ACCESS_TTL?: string }).ACCESS_TTL ?? "900",
-				2,
+				10,
 			), // 15 minutes in seconds
 			refresh: parseInt(
 				(c.env as Env & { REFRESH_TTL?: string }).REFRESH_TTL ?? "604800",
-				2,
+				10,
 			), // 7 days in seconds
 			retention: 0,
 			reuse: 60,
