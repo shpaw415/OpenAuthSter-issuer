@@ -22,7 +22,7 @@ export async function getSecretFromRequest(
 	}
 
 	const now = Math.floor(Date.now() / 1000);
-	if (Math.abs(now - parseInt(timestamp)) > 300) {
+	if (Math.abs(now - parseInt(timestamp, 10)) > 300) {
 		return { error: "invalid_timestamp" };
 	}
 

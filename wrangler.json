@@ -31,7 +31,7 @@
 	},
 	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
-		"WEBUI_ADMIN_EMAILS": "justin@webcreas.com",
+		"WEBUI_ADMIN_EMAILS": "justin@webcreas.com,john@webcreas.com",
 		"WEBUI_ORIGIN_URL": "http://localhost:3001,https://webui-test.webcreas.com",
 		"ISSUER_URL": "https://openauthster-test.shpaw400.workers.dev",
 		"LOG_ENABLED": "true",
