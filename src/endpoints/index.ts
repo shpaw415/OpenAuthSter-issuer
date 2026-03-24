@@ -52,7 +52,7 @@ import {
 	webauthnCredentialsTable,
 } from "openauth-webui-shared-types/database";
 import type { OTFUsersParsedType } from "openauth-webui-shared-types/database/types";
-import { and, drizzle, eq } from "openauth-webui-shared-types/drizzle";
+import { and, drizzle, eq, or } from "openauth-webui-shared-types/drizzle";
 import {
 	type GetUserListFilters,
 	UserListSchemaValidation,
@@ -334,17 +334,19 @@ const user_users_endpoints_middleware = createMiddleware(async (c, next) => {
 
 endpoints.use("/user/*", user_users_endpoints_middleware);
 endpoints.use("/users/*", user_users_endpoints_middleware);
+endpoints.use("/users", user_users_endpoints_middleware);
 
 /**
  * Manage single user by userID and clientID
  * Endpoints:
- * - GET /user/:clientID/:userID - get user details
- * - PUT /user/:clientID/:userID - update user (identifier and data fields only)
- * - DELETE /user/:clientID/:userID - delete user
+ * - GET /user/:userID - get user details
+ * - PUT /user/:userID - update user (identifier and data fields only)
+ * - DELETE /user/:userID - delete user
  */
 endpoints
-	.get("/user/:clientID/:userID", async (c) => {
-		const { clientID, userID } = c.req.param();
+	.get("/user/:userID", async (c) => {
+		const { userID } = c.req.param();
+		const { clientID } = c.get("project");
 		try {
 			const userTable = OTFusersTable(clientID);
 			const user = await drizzle(c.env.AUTH_DB)
@@ -367,7 +369,7 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/user/:clientID/:userID",
+				endpoint: "/user/:userID",
 				params: c.get("params"),
 				project: c.get("project"),
 				log: true,
@@ -386,8 +388,9 @@ endpoints
 			});
 		}
 	})
-	.put("/user/:clientID/:userID", async (c) => {
-		const { clientID, userID } = c.req.param();
+	.put("/user/:userID", async (c) => {
+		const { userID } = c.req.param();
+		const { clientID } = c.get("project");
 		try {
 			const newData = (await c.req.json()) as Partial<
 				ReturnType<typeof OTFusersTable>["$inferSelect"]
@@ -424,7 +427,7 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/user/:clientID/:userID",
+				endpoint: "/user/:userID",
 				params: c.get("params"),
 				project: c.get("project"),
 				log: true,
@@ -439,8 +442,9 @@ endpoints
 			});
 		}
 	})
-	.delete("/user/:clientID/:userID", async (c) => {
-		const { clientID, userID } = c.req.param();
+	.delete("/user/:userID", async (c) => {
+		const { userID } = c.req.param();
+		const { clientID } = c.get("project");
 		try {
 			const userTable = OTFusersTable(clientID);
 			const deleteResult = await drizzle(c.env.AUTH_DB)
@@ -464,7 +468,7 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/user/:clientID/:userID",
+				endpoint: "/user/:userID",
 				params: c.get("params"),
 				project: c.get("project"),
 				log: true,
@@ -486,40 +490,95 @@ endpoints
  * - limit: number of users to return
  * - page: page number (base 1)
  */
-endpoints.get("/users/:clientID", async (c) => {
-	const { clientID } = c.req.param();
-	try {
-		const filters: GetUserListFilters = parseFilters(c.req.query());
-		const users = await fetchUserList(clientID, filters, c.env.AUTH_DB);
-		return c.json(
-			parse(UserListSchemaValidation, {
-				success: true,
-				data: {
-					users,
-					total: users.length,
-				},
-				error: null,
-			} satisfies UserResponseSchemaType),
-		);
-	} catch (err) {
-		if (err instanceof RequestError) throw err;
-		throw new RequestError({
-			message: err instanceof Error ? err.message : String(err),
-			status: err instanceof RequestError ? err.status : 500,
-			endpoint: "/users/:clientID",
-			params: c.get("params"),
-			project: c.get("project"),
-			request: c.req.raw,
-			responseInit: {
-				body: JSON.stringify({
-					success: false,
-					error: err instanceof Error ? err.message : String(err),
-					data: null as unknown as UserResponseSchemaType["data"],
+endpoints
+	.get("/users", async (c) => {
+		const { clientID } = c.get("project");
+		try {
+			const filters: GetUserListFilters = parseFilters(c.req.query());
+			const users = await fetchUserList(clientID, filters, c.env.AUTH_DB);
+			return c.json(
+				parse(UserListSchemaValidation, {
+					success: true,
+					data: {
+						users,
+						total: users.length,
+					},
+					error: null,
 				} satisfies UserResponseSchemaType),
-			},
-		});
-	}
-});
+			);
+		} catch (err) {
+			if (err instanceof RequestError) throw err;
+			throw new RequestError({
+				message: err instanceof Error ? err.message : String(err),
+				status: err instanceof RequestError ? err.status : 500,
+				endpoint: "/users",
+				params: c.get("params"),
+				project: c.get("project"),
+				request: c.req.raw,
+				responseInit: {
+					body: JSON.stringify({
+						success: false,
+						error: err instanceof Error ? err.message : String(err),
+						data: null as unknown as UserResponseSchemaType["data"],
+					} satisfies UserResponseSchemaType),
+				},
+			});
+		}
+	})
+	.get("/users/specific", async (c) => {
+		const userIDs = c.req.queries("user_id");
+		const project = c.get("project");
+
+		if (!userIDs) {
+			return c.json({
+				success: false,
+				error: "No user_id query parameter provided",
+			});
+		}
+
+		try {
+			const userTable = OTFusersTable(project.clientID);
+			const user = await drizzle(c.env.AUTH_DB)
+				.select()
+				.from(userTable)
+				.where(or(...userIDs.map((id) => eq(userTable.id, id))))
+				.all();
+
+			return c.json(
+				parse(UserListSchemaValidation, {
+					success: true,
+					data: {
+						users: user.map(parseDBUser) as Array<OTFUsersParsedType>,
+						total: user.length,
+					},
+					error: null,
+				} satisfies UserResponseSchemaType),
+			);
+		} catch (err) {
+			if (err instanceof RequestError) throw err;
+
+			throw new RequestError({
+				message: err instanceof Error ? err.message : String(err),
+				status: err instanceof RequestError ? err.status : 500,
+				endpoint: "/user/:userID",
+				params: c.get("params"),
+				project: c.get("project"),
+				log: true,
+				request: c.req.raw,
+				responseInit: {
+					body: JSON.stringify({
+						success: false,
+						data: null as unknown as UserResponseSchemaType["data"],
+						error: err instanceof Error ? err.message : String(err),
+					} satisfies UserResponseSchemaType<
+						Record<string, unknown>,
+						Record<string, unknown>,
+						Record<string, unknown>
+					>),
+				},
+			});
+		}
+	});
 
 /**
  * Public session data management for the authenticated user
@@ -563,7 +622,7 @@ endpoints.use(
 );
 
 endpoints
-	.get("/session/public/:clientID", async (c) => {
+	.get("/session/public", async (c) => {
 		try {
 			const userInfo = c.get("userInfo");
 
@@ -579,14 +638,14 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/session/public/:clientID",
+				endpoint: "/session/public",
 				params: c.get("params"),
 				project: c.get("project"),
 				request: c.req.raw,
 			});
 		}
 	})
-	.patch("/session/public/:clientID", async (c) => {
+	.patch("/session/public", async (c) => {
 		try {
 			const userInfo = c.get("userInfo");
 
@@ -613,14 +672,14 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/session/public/:clientID",
+				endpoint: "/session/public",
 				params: c.get("params"),
 				project: c.get("project"),
 				request: c.req.raw,
 			});
 		}
 	})
-	.delete("/session/public/:clientID", async (c) => {
+	.delete("/session/public", async (c) => {
 		try {
 			const userInfo = c.get("userInfo");
 
@@ -648,7 +707,7 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/session/public/:clientID",
+				endpoint: "/session/public",
 				params: c.get("params"),
 				project: c.get("project"),
 				request: c.req.raw,
@@ -661,13 +720,9 @@ endpoints
  */
 
 endpoints.use(
-	"/session/private/:clientID",
+	"/session/private",
 	createMiddleware(async (c, next) => {
-		const project = await getProject({
-			id: c.req.param("clientID") as string,
-			env: c.env,
-			ctx: c,
-		});
+		const project = c.get("project");
 
 		if (!project) {
 			throw new RequestError({
@@ -692,7 +747,7 @@ endpoints.use(
 );
 
 endpoints
-	.get("/session/private/:clientID", async (c) => {
+	.get("/session/private", async (c) => {
 		try {
 			const userInfo = c.get("userInfo");
 
@@ -729,14 +784,14 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/session/private/:clientID",
+				endpoint: "/session/private",
 				params: c.get("params"),
 				project: c.get("project"),
 				request: c.req.raw,
 			});
 		}
 	})
-	.patch("/session/private/:clientID", async (c) => {
+	.patch("/session/private", async (c) => {
 		const userInfo = c.get("userInfo");
 		try {
 			const updateResult = await updateUserPrivateData({
@@ -770,14 +825,14 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/session/private/:clientID",
+				endpoint: "/session/private",
 				params: c.get("params"),
 				project: c.get("project"),
 				request: c.req.raw,
 			});
 		}
 	})
-	.delete("/session/private/:clientID", async (c) => {
+	.delete("/session/private", async (c) => {
 		try {
 			const userInfo = c.get("userInfo");
 
@@ -812,7 +867,7 @@ endpoints
 			throw new RequestError({
 				message: err instanceof Error ? err.message : String(err),
 				status: err instanceof RequestError ? err.status : 500,
-				endpoint: "/session/private/:clientID",
+				endpoint: "/session/private",
 				params: c.get("params"),
 				project: c.get("project"),
 				request: c.req.raw,
@@ -1932,7 +1987,7 @@ endpoints.all("*", async (c) => {
 			? await generateProvidersFromConfig({
 					project: project,
 					env: c.env,
-					copyTemplateId: params.copyID,
+					copyTemplateName: params.copyID,
 					ctx: c,
 				})
 			: {},

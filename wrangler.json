@@ -59,6 +59,11 @@
 			"pattern": "5905b08e65d241afa171a751b70685fd-auth-test.webcreas.com",
 			"zone_name": "webcreas.com",
 			"custom_domain": true
+		},
+		{
+			"pattern": "6761f3d22f844bfbb44b82cd0deb2bee-auth-test.webcreas.com",
+			"zone_name": "webcreas.com",
+			"custom_domain": true
 		}
 	]
 }

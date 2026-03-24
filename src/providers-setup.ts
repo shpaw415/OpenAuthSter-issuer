@@ -27,7 +27,7 @@ import {
 	emailTemplatesTable,
 	WebUiCopyTemplateTable,
 } from "openauth-webui-shared-types/database";
-import { drizzle, eq } from "openauth-webui-shared-types/drizzle";
+import { and, drizzle, eq } from "openauth-webui-shared-types/drizzle";
 import type { QRProviderOnSuccessData } from "openauth-webui-shared-types/providers/custom/qr/index.ts";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import getGlobalConfig from "../openauth.config";
@@ -75,7 +75,7 @@ type ConfigType<
 		providerConfig: ProviderConf;
 		env: Env;
 		project: Project;
-		copyTemplateId: string | null;
+		copyTemplate: ReturnType<typeof parseDBCopyTemplate> | undefined;
 		ctx: EndpointCtx;
 	}) => Promise<Provider> | Provider;
 	parser: userExtractFunction<Input, Output, ProviderConf>;
@@ -247,24 +247,28 @@ export async function sendTwilioSMS({
 	return res.json();
 }
 
-async function getCopyTemplateFromId<T extends keyof CopyDataSelection>({
-	id,
+async function getCopyTemplateFromName({
+	name,
 	env,
-	provider,
+	project,
 }: {
-	id: string | null;
+	name: string | null;
+	project: Project;
 	env: Env;
-	provider: T;
-}): Promise<CopyDataSelection[T] | undefined> {
-	if (!id) return undefined;
+}): Promise<ReturnType<typeof parseDBCopyTemplate> | undefined> {
+	if (!name) return undefined;
 	const template = await drizzle(env.AUTH_DB)
 		.select()
 		.from(WebUiCopyTemplateTable)
-		.where(eq(WebUiCopyTemplateTable.name, id))
-		.limit(1)
+		.where(
+			and(
+				eq(WebUiCopyTemplateTable.name, name),
+				eq(WebUiCopyTemplateTable.owner_id, project.owner_id),
+			),
+		)
 		.get();
 	if (!template) return undefined;
-	return parseDBCopyTemplate(template).copyData[provider];
+	return parseDBCopyTemplate(template);
 }
 
 function OAuth2Fetcher<UserInfo>(
@@ -296,7 +300,7 @@ const passwordConfigBuilder: ConfigType<
 	{ provider: "password"; email: string },
 	{ email: string }
 > = {
-	provider: ({ globalConfig, providerConfig, env, project, copyTemplateId }) =>
+	provider: ({ globalConfig, providerConfig, env, project, copyTemplate }) =>
 		import("@kagii/openauth/provider/password").then(async (mod) =>
 			mod.PasswordProvider(
 				PasswordUI({
@@ -318,11 +322,7 @@ const passwordConfigBuilder: ConfigType<
 							});
 						}
 					},
-					copy: await getCopyTemplateFromId({
-						id: copyTemplateId ?? null,
-						env,
-						provider: "password",
-					}),
+					copy: copyTemplate?.copyData.password,
 					validatePassword(password) {
 						const {
 							minLength,
@@ -405,14 +405,9 @@ const codeConfigBuilder: ConfigType<
 	},
 	{ email?: string; phone?: string }
 > = {
-	provider: async ({ env, globalConfig, project, copyTemplateId, ctx }) => {
-		const copyData = await getCopyTemplateFromId({
-			id: copyTemplateId ?? null,
-			env,
-			provider: "code",
-		});
+	provider: async ({ env, globalConfig, project, copyTemplate, ctx }) => {
 		const codeUI = (await import("@kagii/openauth/ui/code")).CodeUI({
-			copy: copyData,
+			copy: copyTemplate?.copyData.code,
 			mode: project.codeMode,
 			sendCode: async (claim, code) => {
 				// Trigger webhooks for code_sent event
@@ -1103,7 +1098,7 @@ const qrBuilder: ConfigType<
 	QRProviderOnSuccessData,
 	QRProviderOnSuccessData
 > = {
-	async provider({ env, copyTemplateId, project, ctx }) {
+	async provider({ env, copyTemplate, project, ctx }) {
 		if (!project.originURL)
 			throw new Error("Project origin URL is required for QR provider");
 
@@ -1121,11 +1116,7 @@ const qrBuilder: ConfigType<
 			QrUI({
 				issuerURI: new URL(ctx.req.url).origin,
 				binding: env.QR_AUTH_DO,
-				copy: await getCopyTemplateFromId({
-					id: copyTemplateId ?? null,
-					provider: "qr",
-					env,
-				}),
+				copy: copyTemplate?.copyData.qr,
 				client_id: project.clientID,
 				//@ts-expect-error
 				issuer: issuer,
@@ -1149,7 +1140,7 @@ const passkeyBuilder: ConfigType<
 	{ identifier: string },
 	Record<string, string>
 > = {
-	provider: async ({ env, copyTemplateId, project, ctx }) => {
+	provider: async ({ env, copyTemplate, project, ctx }) => {
 		const mod = (await import(
 			//@ts-expect-error
 			"../node_modules/openauth-webui-shared-types/providers/build/passkey/index.js"
@@ -1164,11 +1155,7 @@ const passkeyBuilder: ConfigType<
 
 		return mod.WebAuthnProvider({
 			UI: mod.PassKeyUI({
-				copy: await getCopyTemplateFromId({
-					id: copyTemplateId ?? null,
-					provider: "passkey",
-					env,
-				}),
+				copy: copyTemplate?.copyData.passkey,
 			}),
 			db: env.AUTH_DB,
 			origin: autorizedOrigin,
@@ -1213,13 +1200,13 @@ const providerConfigMap: Record<ProviderType, ConfigType<any, any, any>> = {
 async function generateProvidersFromConfig({
 	project,
 	env,
-	copyTemplateId,
+	copyTemplateName,
 	ctx,
 }: {
 	project: Project;
 	env: Env;
 	ctx: EndpointCtx;
-	copyTemplateId: string | null;
+	copyTemplateName: string | null;
 }): Promise<Record<string, Provider<unknown>>> {
 	const globalConfig: ExternalGlobalProjectConfig = await getGlobalConfig(env);
 
@@ -1236,7 +1223,11 @@ async function generateProvidersFromConfig({
 							globalConfig,
 							project,
 							providerConfig,
-							copyTemplateId,
+							copyTemplate: await getCopyTemplateFromName({
+								name: copyTemplateName ?? null,
+								env,
+								project,
+							}),
 							ctx,
 						}),
 					};
