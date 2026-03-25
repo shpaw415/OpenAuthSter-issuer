@@ -1,12 +1,16 @@
-import { createExternalGlobalProjectConfig } from "openauth-webui-shared-types";
+import {
+	createExternalGlobalProjectConfig,
+	type Project,
+} from "openauth-webui-shared-types";
 import { defaultSubjectSchema } from "openauth-webui-shared-types/client/user";
 import type { InferOutput } from "valibot";
+import type { EndpointCtx } from "./src/endpoints/types";
 
-export default async (env: Env) =>
+export default async (_ctx: EndpointCtx, _project: Project) =>
 	createExternalGlobalProjectConfig<InferOutput<typeof subjects.user>>({
 		register: {
 			fallbackEmailFrom: "fallback@example.com",
-			onSuccessfulRegistration(ctx, value, request) {
+			onSuccessfulRegistration(_ctx, _value, _request) {
 				//console.log(ctx, value);
 			},
 			strategy: {

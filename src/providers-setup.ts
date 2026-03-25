@@ -34,6 +34,7 @@ import getGlobalConfig from "../openauth.config";
 import DefaultEmailTemplateBody from "./defaults/email";
 import type { EndpointCtx } from "./endpoints/types.ts";
 import { toAuthorizeOrigin } from "./share.ts";
+import { createSandboxedFunction } from "./sandbox";
 
 export type userExtractResult<T extends Record<string, unknown>> = {
 	identifier: string;
@@ -90,9 +91,11 @@ const defaultEmailTemplateProps: EmailTemplateProps = {
 async function getEmailTemplate({
 	env,
 	name,
+	project,
 }: {
 	env: Env;
 	name?: string | null;
+	project: Project;
 }): Promise<EmailTemplateProps> {
 	if (!name) return defaultEmailTemplateProps;
 
@@ -103,7 +106,12 @@ async function getEmailTemplate({
 			body: emailTemplatesTable.body,
 		})
 		.from(emailTemplatesTable)
-		.where(eq(emailTemplatesTable.name, name))
+		.where(
+			and(
+				eq(emailTemplatesTable.name, name),
+				eq(emailTemplatesTable.owner_id, project.owner_id),
+			),
+		)
 		.limit(1)
 		.get()
 		.then((el) =>
@@ -140,10 +148,10 @@ async function sendCodeWithEmail({
 				from: `${project.projectData.companyName || "Acme"} <${project.projectData?.emailFrom || globalConfig.register.fallbackEmailFrom}>`,
 				to: [to],
 				subject: emailTemplate.subject || "Your verification code",
-				html: mustache.render(emailTemplate.body, {
-					code,
-					...project.projectData,
-				}),
+				html: mustache.render(
+					emailTemplate.body,
+					parseEmailTemplateProps({ ...project.projectData, code }),
+				),
 			});
 			if (result.error) {
 				console.error(`Failed to send email to ${to}:`, result.error);
@@ -161,6 +169,23 @@ async function sendCodeWithEmail({
 		default:
 			console.log(`Sending code ${code} to ${to} via default method`);
 	}
+}
+
+export function parseEmailTemplateProps(
+	emailProps?: Record<string, string | undefined>,
+): Record<string, unknown> {
+	if (!emailProps) return {};
+	return Object.fromEntries(
+		Object.entries(emailProps).map(([key, value]) => {
+			if (!value) return [key, value];
+			if (value.startsWith("function::")) {
+				const body = value.replace("function::", "");
+				const sandboxed = createSandboxedFunction(body);
+				return [key, () => sandboxed(emailProps as Record<string, unknown>)];
+			}
+			return [key, value];
+		}),
+	);
 }
 
 async function sendCodeWithSMS({
@@ -187,10 +212,7 @@ async function sendCodeWithSMS({
 				from: twilioConfig.fromNumber,
 				body: (await import("mustache")).default.render(
 					emailTemplateProps.body,
-					{
-						code,
-						...project.projectData,
-					},
+					parseEmailTemplateProps({ ...project.projectData, code }),
 				),
 			});
 			console.log("Twilio SMS log:", res);
@@ -318,6 +340,7 @@ const passwordConfigBuilder: ConfigType<
 								emailTemplate: await getEmailTemplate({
 									env,
 									name: project.emailTemplateId,
+									project,
 								}),
 							});
 						}
@@ -436,6 +459,7 @@ const codeConfigBuilder: ConfigType<
 							emailTemplate: await getEmailTemplate({
 								env,
 								name: project.emailTemplateId,
+								project,
 							}),
 						});
 						break;
@@ -451,6 +475,7 @@ const codeConfigBuilder: ConfigType<
 							emailTemplateProps: await getEmailTemplate({
 								env,
 								name: project.emailTemplateId,
+								project,
 							}),
 							project,
 						});
@@ -1208,7 +1233,10 @@ async function generateProvidersFromConfig({
 	ctx: EndpointCtx;
 	copyTemplateName: string | null;
 }): Promise<Record<string, Provider<unknown>>> {
-	const globalConfig: ExternalGlobalProjectConfig = await getGlobalConfig(env);
+	const globalConfig: ExternalGlobalProjectConfig = await getGlobalConfig(
+		ctx,
+		project,
+	);
 
 	const providers = (
 		await Promise.all(
