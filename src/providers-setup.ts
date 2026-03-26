@@ -6,7 +6,7 @@ import type {
 	AppleOIDCProviderConfig,
 	CodeProviderConfig,
 	CognitoProviderConfig,
-	CopyDataSelection,
+	authCodeType,
 	EmailTemplateProps,
 	ExternalGlobalProjectConfig,
 	GenericOAuthProviderConfig,
@@ -57,9 +57,9 @@ export type OnSuccessParserData<T> = {
 
 export type TokenSet = {
 	access: string;
-	refresh: any;
+	refresh: string;
 	expiry: number;
-	raw: Record<string, any>;
+	raw: Record<string, unknown>;
 };
 
 export type TokenSetKey = {
@@ -90,14 +90,14 @@ const defaultEmailTemplateProps: EmailTemplateProps = {
 
 async function getEmailTemplate({
 	env,
-	name,
+	id,
 	project,
 }: {
 	env: Env;
-	name?: string | null;
+	id?: number | null;
 	project: Project;
 }): Promise<EmailTemplateProps> {
-	if (!name) return defaultEmailTemplateProps;
+	if (!id) return defaultEmailTemplateProps;
 
 	return drizzle(env.AUTH_DB)
 		.select({
@@ -108,7 +108,7 @@ async function getEmailTemplate({
 		.from(emailTemplatesTable)
 		.where(
 			and(
-				eq(emailTemplatesTable.name, name),
+				eq(emailTemplatesTable.id, id),
 				eq(emailTemplatesTable.owner_id, project.owner_id),
 			),
 		)
@@ -124,20 +124,59 @@ async function getEmailTemplate({
 		);
 }
 
-async function sendCodeWithEmail({
+async function sendCode({
 	code,
 	project,
 	to,
 	globalConfig,
 	emailTemplate,
+	type,
+	send_type,
 }: {
 	code: string;
 	project: Project;
 	to: string;
 	globalConfig: ExternalGlobalProjectConfig;
 	emailTemplate: EmailTemplateProps;
+	type: authCodeType;
+	send_type: "email" | "phone";
 }) {
-	if (project.codeMode !== "email") return;
+	if (send_type === "email") {
+		await sendCodeWithEmail({
+			code,
+			project,
+			to,
+			globalConfig,
+			emailTemplate,
+			type,
+		});
+	} else if (send_type === "phone") {
+		await sendCodeWithSMS({
+			code,
+			project,
+			to,
+			globalConfig,
+			emailTemplateProps: emailTemplate,
+			type,
+		});
+	}
+}
+
+async function sendCodeWithEmail({
+	code,
+	project,
+	to,
+	globalConfig,
+	emailTemplate,
+	type,
+}: {
+	code: string;
+	project: Project;
+	to: string;
+	globalConfig: ExternalGlobalProjectConfig;
+	emailTemplate: EmailTemplateProps;
+	type: authCodeType;
+}) {
 	const mustache = (await import("mustache")).default;
 	switch (globalConfig.register.strategy.email?.provider) {
 		case "resend": {
@@ -150,7 +189,7 @@ async function sendCodeWithEmail({
 				subject: emailTemplate.subject || "Your verification code",
 				html: mustache.render(
 					emailTemplate.body,
-					parseEmailTemplateProps({ ...project.projectData, code }),
+					parseEmailTemplateProps({ ...project.projectData, code, type }),
 				),
 			});
 			if (result.error) {
@@ -170,6 +209,45 @@ async function sendCodeWithEmail({
 			console.log(`Sending code ${code} to ${to} via default method`);
 	}
 }
+async function sendCodeWithSMS({
+	code,
+	to,
+	globalConfig,
+	emailTemplateProps,
+	project,
+	type,
+}: {
+	code: string;
+	to: string;
+	globalConfig: ExternalGlobalProjectConfig;
+	emailTemplateProps: EmailTemplateProps;
+	project: Project;
+	type: authCodeType;
+}) {
+	switch (globalConfig.register.strategy.phone?.provider) {
+		case "twilio": {
+			const twilioConfig = globalConfig.register.strategy.phone;
+			const res = await sendTwilioSMS({
+				accountSid: twilioConfig.accountSID,
+				authToken: twilioConfig.authToken,
+				to,
+				from: twilioConfig.fromNumber,
+				body: (await import("mustache")).default.render(
+					emailTemplateProps.body,
+					parseEmailTemplateProps({ ...project.projectData, code, type }),
+				),
+			});
+			console.log("Twilio SMS log:", res);
+			break;
+		}
+		case "custom":
+			await globalConfig.register.strategy.phone.sendSMSFunction(to, code);
+			break;
+		default:
+			console.log(`Sending code ${code} to ${to} via default SMS method`);
+			break;
+	}
+}
 
 export function parseEmailTemplateProps(
 	emailProps?: Record<string, string | undefined>,
@@ -186,45 +264,6 @@ export function parseEmailTemplateProps(
 			return [key, value];
 		}),
 	);
-}
-
-async function sendCodeWithSMS({
-	code,
-	to,
-	globalConfig,
-	emailTemplateProps,
-	project,
-}: {
-	code: string;
-	to: string;
-	globalConfig: ExternalGlobalProjectConfig;
-	emailTemplateProps: EmailTemplateProps;
-	project: Project;
-}) {
-	if (project.codeMode !== "phone") return;
-	switch (globalConfig.register.strategy.phone?.provider) {
-		case "twilio": {
-			const twilioConfig = globalConfig.register.strategy.phone;
-			const res = await sendTwilioSMS({
-				accountSid: twilioConfig.accountSID,
-				authToken: twilioConfig.authToken,
-				to,
-				from: twilioConfig.fromNumber,
-				body: (await import("mustache")).default.render(
-					emailTemplateProps.body,
-					parseEmailTemplateProps({ ...project.projectData, code }),
-				),
-			});
-			console.log("Twilio SMS log:", res);
-			break;
-		}
-		case "custom":
-			await globalConfig.register.strategy.phone.sendSMSFunction(to, code);
-			break;
-		default:
-			console.log(`Sending code ${code} to ${to} via default SMS method`);
-			break;
-	}
 }
 
 type TwilioSMSParams = {
@@ -322,28 +361,54 @@ const passwordConfigBuilder: ConfigType<
 	{ provider: "password"; email: string },
 	{ email: string }
 > = {
-	provider: ({ globalConfig, providerConfig, env, project, copyTemplate }) =>
+	provider: ({
+		globalConfig,
+		providerConfig,
+		env,
+		project,
+		copyTemplate,
+		ctx,
+	}) =>
 		import("@kagii/openauth/provider/password").then(async (mod) =>
 			mod.PasswordProvider(
 				PasswordUI({
-					sendCode: async (email, code) => {
+					sendCode: async (
+						email,
+						code,
+						type: "change" | "register" | undefined,
+					) => {
 						if (project.codeMode === "phone")
 							console.warn(
 								"Project is set to phone code mode, but password provider is only supporting sending code via email.",
 							);
-						if (project.codeMode === "email") {
-							await sendCodeWithEmail({
-								to: email,
-								code,
-								globalConfig,
+						await sendCode({
+							to: email,
+							code,
+							globalConfig,
+							project,
+							type:
+								type === "change" ? "change_password" : (type ?? "register"),
+							emailTemplate: await getEmailTemplate({
+								env,
+								id: project.emailTemplateId,
 								project,
-								emailTemplate: await getEmailTemplate({
-									env,
-									name: project.emailTemplateId,
-									project,
-								}),
+							}),
+							send_type: "email",
+						}).then(() => {
+							// Trigger webhooks for code_sent event
+							return new WebHook({ db: env.AUTH_DB }).trigger({
+								clientID: project.clientID,
+								event: "code_sent",
+								secret: project.secret,
+								data: {
+									code,
+									method: project.codeMode,
+									send_to: email,
+									provider: "password",
+								},
+								request: ctx.req.raw,
 							});
-						}
+						});
 					},
 					copy: copyTemplate?.copyData.password,
 					validatePassword(password) {
@@ -433,56 +498,33 @@ const codeConfigBuilder: ConfigType<
 			copy: copyTemplate?.copyData.code,
 			mode: project.codeMode,
 			sendCode: async (claim, code) => {
-				// Trigger webhooks for code_sent event
-				await new WebHook({ db: env.AUTH_DB }).trigger({
-					clientID: project.clientID,
-					event: "code_sent",
-					secret: project.secret,
-					data: {
-						code,
-						method: project.codeMode,
-						send_to: claim.email || claim.phone,
-					},
-					request: ctx.req.raw,
+				await sendCode({
+					code,
+					project,
+					to: claim.email || claim.phone,
+					globalConfig,
+					emailTemplate: await getEmailTemplate({
+						env,
+						id: project.emailTemplateId,
+						project,
+					}),
+					type: "login",
+					send_type: claim.email ? "email" : "phone",
+				}).then(() => {
+					// Trigger webhooks for code_sent event
+					return new WebHook({ db: env.AUTH_DB }).trigger({
+						clientID: project.clientID,
+						event: "code_sent",
+						secret: project.secret,
+						data: {
+							code,
+							method: project.codeMode,
+							send_to: claim.email || claim.phone,
+							provider: "code",
+						},
+						request: ctx.req.raw,
+					});
 				});
-
-				switch (project.codeMode) {
-					case "email":
-						if (!claim.email) {
-							throw new Error("No email provided for code delivery.");
-						}
-						await sendCodeWithEmail({
-							code,
-							to: claim.email as string,
-							globalConfig,
-							project,
-							emailTemplate: await getEmailTemplate({
-								env,
-								name: project.emailTemplateId,
-								project,
-							}),
-						});
-						break;
-					case "phone":
-						if (!claim.phone) {
-							throw new Error("No phone number provided for code delivery.");
-						}
-
-						await sendCodeWithSMS({
-							code,
-							to: claim.phone as string,
-							globalConfig,
-							emailTemplateProps: await getEmailTemplate({
-								env,
-								name: project.emailTemplateId,
-								project,
-							}),
-							project,
-						});
-						break;
-					default:
-						throw new Error(`Unsupported code mode: ${project.codeMode}`);
-				}
 			},
 		});
 		const codeProvider = (await import("@kagii/openauth/provider/code"))
