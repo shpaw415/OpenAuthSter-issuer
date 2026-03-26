@@ -4,9 +4,9 @@ import type { JWTPayload } from "jose";
 import type {
 	AppleOAuthProviderConfig,
 	AppleOIDCProviderConfig,
+	authCodeType,
 	CodeProviderConfig,
 	CognitoProviderConfig,
-	authCodeType,
 	EmailTemplateProps,
 	ExternalGlobalProjectConfig,
 	GenericOAuthProviderConfig,
@@ -33,8 +33,8 @@ import { WebHook } from "openauth-webui-shared-types/webhook";
 import getGlobalConfig from "../openauth.config";
 import DefaultEmailTemplateBody from "./defaults/email";
 import type { EndpointCtx } from "./endpoints/types.ts";
+import { SandBox } from "./sandbox.mts";
 import { toAuthorizeOrigin } from "./share.ts";
-import { createSandboxedFunction } from "./sandbox";
 
 export type userExtractResult<T extends Record<string, unknown>> = {
 	identifier: string;
@@ -189,7 +189,7 @@ async function sendCodeWithEmail({
 				subject: emailTemplate.subject || "Your verification code",
 				html: mustache.render(
 					emailTemplate.body,
-					parseEmailTemplateProps({ ...project.projectData, code, type }),
+					await parseEmailTemplateProps({ ...project.projectData, code, type }),
 				),
 			});
 			if (result.error) {
@@ -234,14 +234,18 @@ async function sendCodeWithSMS({
 				from: twilioConfig.fromNumber,
 				body: (await import("mustache")).default.render(
 					emailTemplateProps.body,
-					parseEmailTemplateProps({ ...project.projectData, code, type }),
+					await parseEmailTemplateProps({ ...project.projectData, code, type }),
 				),
 			});
 			console.log("Twilio SMS log:", res);
 			break;
 		}
 		case "custom":
-			await globalConfig.register.strategy.phone.sendSMSFunction(to, code);
+			await globalConfig.register.strategy.phone.sendSMSFunction(
+				to,
+				code,
+				type,
+			);
 			break;
 		default:
 			console.log(`Sending code ${code} to ${to} via default SMS method`);
@@ -249,17 +253,20 @@ async function sendCodeWithSMS({
 	}
 }
 
-export function parseEmailTemplateProps(
+export async function parseEmailTemplateProps(
 	emailProps?: Record<string, string | undefined>,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
 	if (!emailProps) return {};
+	let _sandbox: SandBox | undefined;
+	if (Object.values(emailProps).some((v) => v?.startsWith("function::")))
+		_sandbox = await SandBox.create();
 	return Object.fromEntries(
 		Object.entries(emailProps).map(([key, value]) => {
 			if (!value) return [key, value];
 			if (value.startsWith("function::")) {
 				const body = value.replace("function::", "");
-				const sandboxed = createSandboxedFunction(body);
-				return [key, () => sandboxed(emailProps as Record<string, unknown>)];
+				const sandboxed = _sandbox?.createSandboxedFunction(body);
+				return [key, () => sandboxed?.(emailProps as Record<string, unknown>)];
 			}
 			return [key, value];
 		}),

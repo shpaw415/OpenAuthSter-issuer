@@ -44,7 +44,7 @@ describe("functional correctness", () => {
 	});
 
 	it("can use JSON", () => {
-		expect(run('return JSON.stringify({a:1});')).toBe('{"a":1}');
+		expect(run("return JSON.stringify({a:1});")).toBe('{"a":1}');
 	});
 
 	it("can use parseInt / parseFloat", () => {
@@ -109,7 +109,10 @@ describe("host isolation", () => {
 	});
 
 	it("crypto is not accessible", () => {
-		assertNotHostObject("return crypto;", (globalThis as Record<string, unknown>).crypto);
+		assertNotHostObject(
+			"return crypto;",
+			(globalThis as Record<string, unknown>).crypto,
+		);
 	});
 
 	it("eval cannot reach host globals", () => {
@@ -119,7 +122,10 @@ describe("host isolation", () => {
 	});
 
 	it("process is not the host process", () => {
-		assertNotHostObject("return process;", (globalThis as Record<string, unknown>).process);
+		assertNotHostObject(
+			"return process;",
+			(globalThis as Record<string, unknown>).process,
+		);
 	});
 
 	it("setTimeout / setInterval are not accessible", () => {
