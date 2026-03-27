@@ -28,6 +28,7 @@
 		"wrangler": "4.67.0"
 	},
 	"dependencies": {
+		"@cf-wasm/quickjs": "^0.2.4",
 		"@css-inline/css-inline-wasm": "^0.20.1",
 		"@kagii/openauth": "^0.6.0",
 		"@simplewebauthn/server": "^13.3.0",

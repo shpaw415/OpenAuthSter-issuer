@@ -1,41 +1,5 @@
-import type { QuickJSWASMModule } from "quickjs-emscripten";
+import type { QuickJSWASMModule } from "@cf-wasm/quickjs/workerd";
 import { transform } from "sucrase";
-
-async function resolveWasmVariantOptions(
-	wasmImport: string | ArrayBuffer | ArrayBufferView | WebAssembly.Module,
-): Promise<
-	| { wasmBinary: ArrayBuffer; wasmModule?: never }
-	| { wasmBinary?: never; wasmModule: WebAssembly.Module }
-> {
-	if (wasmImport instanceof WebAssembly.Module) {
-		return { wasmModule: wasmImport };
-	}
-
-	if (wasmImport instanceof ArrayBuffer) {
-		return { wasmBinary: wasmImport };
-	}
-
-	if (ArrayBuffer.isView(wasmImport)) {
-		const bytes = new Uint8Array(wasmImport.byteLength);
-		bytes.set(
-			new Uint8Array(
-				wasmImport.buffer,
-				wasmImport.byteOffset,
-				wasmImport.byteLength,
-			),
-		);
-		return { wasmBinary: bytes.buffer };
-	}
-
-	const bunFile = globalThis.Bun?.file?.(wasmImport);
-	if (!bunFile) {
-		throw new Error(
-			`Unsupported WASM import value: expected bytes or module, received path ${wasmImport}`,
-		);
-	}
-
-	return { wasmBinary: await bunFile.arrayBuffer() };
-}
 
 // Initialize the QuickJS WASM VM once at module load.
 // In Cloudflare Workers (ES module format) and Bun, top-level await is supported.
@@ -49,15 +13,8 @@ export class SandBox {
 	}
 
 	private async init() {
-		const { newVariant, newQuickJSWASMModule, DEBUG_SYNC } = await import(
-			"quickjs-emscripten"
-		);
-		const wasmModuleImport = (await import("./DEBUG_SYNC.wasm")).default;
-		const cloudflareVariant = newVariant(DEBUG_SYNC, {
-			...(await resolveWasmVariantOptions(wasmModuleImport)),
-			wasmSourceMapData: (await import("./DEBUG_SYNC.wasm.map.txt")).default,
-		});
-		this._qjs = await newQuickJSWASMModule(cloudflareVariant);
+		const { getQuickJSWASMModule } = await import("@cf-wasm/quickjs/workerd");
+		this._qjs = await getQuickJSWASMModule();
 		return this;
 	}
 
@@ -71,10 +28,18 @@ export class SandBox {
 				throw new Error("Failed to create QuickJS context");
 			}
 
+			let transformed: string;
 			try {
-				const test = ctx.evalCode(
-					`(function(props) { ${transform(body, { transforms: ["typescript"] }).code} })`,
+				transformed = transform(body, { transforms: ["typescript"] }).code;
+			} catch (e) {
+				ctx.dispose();
+				throw new Error(
+					`Invalid template function body: ${JSON.stringify(String(e))}`,
 				);
+			}
+
+			try {
+				const test = ctx.evalCode(`(function(props) { ${transformed} })`);
 				if (test.error) {
 					const msg = ctx.dump(test.error);
 					test.error.dispose();

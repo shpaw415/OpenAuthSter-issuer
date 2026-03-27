@@ -1,1 +1,1 @@
-Add in shared type a client helper
+transfer cleanupOpenAuthStateForUser to the SDK for using it in the WebUI as well.

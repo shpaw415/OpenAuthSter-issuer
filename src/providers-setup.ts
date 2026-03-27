@@ -30,11 +30,19 @@ import {
 import { and, drizzle, eq } from "openauth-webui-shared-types/drizzle";
 import type { QRProviderOnSuccessData } from "openauth-webui-shared-types/providers/custom/qr/index.ts";
 import { WebHook } from "openauth-webui-shared-types/webhook";
+import { initWasm, inline as inlineCss } from "@css-inline/css-inline-wasm";
+import cssInlineWasm from "@css-inline/css-inline-wasm/index_bg.wasm";
 import getGlobalConfig from "../openauth.config";
 import DefaultEmailTemplateBody from "./defaults/email";
 import type { EndpointCtx } from "./endpoints/types.ts";
 import { SandBox } from "./sandbox.mts";
 import { toAuthorizeOrigin } from "./share.ts";
+
+let _cssInlineReady: Promise<void> | null = null;
+function ensureCssInline() {
+	if (!_cssInlineReady) _cssInlineReady = initWasm(cssInlineWasm);
+	return _cssInlineReady;
+}
 
 export type userExtractResult<T extends Record<string, unknown>> = {
 	identifier: string;
@@ -151,18 +159,19 @@ async function sendCode({
 			code,
 			type,
 			AcceptLanguage: ctx.req.raw.headers.get("accept-language") || "",
+			to,
 		}),
 	);
 
 	if (send_type === "email") {
-		const { inline } = await import("@css-inline/css-inline-wasm");
+		await ensureCssInline();
 		await sendCodeWithEmail({
 			code,
 			project,
 			to,
 			globalConfig,
 			emailTemplate,
-			emailBody: inline(body),
+			emailBody: inlineCss(body),
 			type,
 			ctx,
 		});

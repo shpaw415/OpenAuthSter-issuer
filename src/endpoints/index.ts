@@ -4,7 +4,6 @@ import { env } from "cloudflare:workers";
 import { issuer } from "@kagii/openauth/issuer";
 import type { Provider } from "@kagii/openauth/provider/provider";
 import { D1Storage } from "@kagii/openauth/storage/d1";
-import type { StorageAdapter } from "@kagii/openauth/storage/storage";
 // OpenAuth imports
 import type { Theme } from "@kagii/openauth/ui/theme";
 import type {
@@ -49,7 +48,6 @@ import {
 	serializeDBUser,
 	totpTokenTable,
 	uiStyleTable,
-	webAuthnTokenAccessTable,
 	webauthnChallengesTable,
 	webauthnCredentialsTable,
 } from "openauth-webui-shared-types/database";
@@ -82,6 +80,7 @@ import { IniviteManager } from "./invite";
 import { encryptData, verifyData } from "./security";
 import { getSecretFromRequest, getTokenFromRequest } from "./shared";
 import type { EndpointCtx, EndpointVariables, Params } from "./types";
+import { deleteUserWithAuthState } from "openauth-webui-shared-types/user/delete";
 
 export const endpoints = new Hono<{
 	Bindings: Env;
@@ -451,7 +450,7 @@ endpoints
 			const deleteResult = await deleteUserWithAuthState({
 				userID,
 				clientID,
-				env: c.env,
+				d1db: c.env.AUTH_DB,
 			});
 
 			if (!deleteResult.success) {
@@ -905,7 +904,7 @@ endpoints.delete("/manage/user", async (c) => {
 		const deleteResult = await deleteUserWithAuthState({
 			userID: userInfo.id,
 			clientID: project.clientID,
-			env: c.env,
+			d1db: c.env.AUTH_DB,
 		});
 
 		if (!deleteResult.success) {
@@ -1932,33 +1931,6 @@ endpoints.delete("/admin/totp/:userID", async (c) => {
 	}
 });
 
-// Auth endpoints /////////////////////////////////////////////////
-
-// Restrictions MiddleWares //////////////////////////////////////
-endpoints.use(
-	"/password/register",
-	createMiddleware(async (c, next) => {
-		const params: Params = c.get("params");
-
-		if (params.clientID !== PUBLIC_CLIENT_ID || c.req.method !== "POST")
-			return next();
-		const fd = await c.req.raw.clone().formData();
-		const action = fd.get("action")?.toString() as "register" | "verify";
-		if (action !== "register") return next();
-		const email = fd.get("email")?.toString();
-		const isAdmin = (c.env as Env).WEBUI_ADMIN_EMAILS.split(",")
-			.map((email) => email.trim())
-			.some((adminEmail) => {
-				if (adminEmail === email) return true;
-				return false;
-			});
-		if (!isAdmin) {
-			return c.json({ error: "Unauthorized: Not an admin email" }, 401);
-		}
-		return next();
-	}),
-);
-
 // Options Cors
 
 /**
@@ -2070,10 +2042,6 @@ endpoints.all("*", async (c) => {
 				JSON.stringify({ value }, null, 2),
 			);
 
-			await (
-				await globalOpenAutsterConfig(c, project)
-			).register.onSuccessfulRegistration?.(ctx, value, request);
-
 			const userData = await getOrCreateUser({
 				env: c.env,
 				value,
@@ -2084,6 +2052,21 @@ endpoints.all("*", async (c) => {
 				params,
 				ctx: c,
 			});
+
+			const onSuccessResult = await (
+				await globalOpenAutsterConfig(c, project)
+			).register.onSuccessfulAuthentication?.(
+				ctx,
+				value,
+				request,
+				userData.type,
+			);
+
+			if (onSuccessResult?.success === false) {
+				throw onSuccessResult.error
+					? onSuccessResult.error
+					: new Error("Authentication blocked");
+			}
 
 			const logger = insertLog({
 				type: "info",
@@ -2110,8 +2093,15 @@ endpoints.all("*", async (c) => {
 			return Promise.all([logger, res]).then(([_, res]) => res);
 		},
 		async error(error, req) {
-			console.error(`Error during authentication for ${req.url}:`, error);
-			console.log(req);
+			insertLog({
+				type: "error",
+				message: `Authentication error: ${(error as Error).message}`,
+				clientID: project?.clientID ?? "unknown",
+				context: {
+					error: error instanceof Error ? error.message : String(error),
+				},
+				database: c.env.AUTH_DB,
+			});
 			throw new RequestError({
 				message: `Authentication error: ${(error as Error).message}`,
 				status: 500,
@@ -2403,263 +2393,6 @@ async function fetchUserList(
 			await drizzle(database).select().from(OTFusersTable(clientID)).all()
 		).map(parseDBUser) as OTFUsersParsedType[];
 	}
-}
-
-function createStorageKeyFingerprint(key: string[]): string {
-	return JSON.stringify(key);
-}
-
-function buildIssuerSubjectPayload(user: OTFUsersParsedType, clientID: string) {
-	return {
-		id: user.id,
-		data: user.data ?? {},
-		identifier: user.identifier,
-		clientID,
-		provider: user.data?.provider ?? "password",
-		role: null,
-	};
-}
-
-async function resolveOpenAuthSubject(
-	type: string,
-	properties: Record<string, unknown>,
-): Promise<string> {
-	const data = new TextEncoder().encode(JSON.stringify(properties));
-	const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-	const hashHex = Array.from(new Uint8Array(hashBuffer))
-		.map((value) => value.toString(16).padStart(2, "0"))
-		.join("");
-	return `${type}:${hashHex.slice(0, 16)}`;
-}
-
-function getProviderStorageKeys(user: OTFUsersParsedType): string[][] {
-	if (user.data?.provider === "password") {
-		return [
-			["email", String(user.identifier).toLowerCase(), "password"],
-			["email", String(user.identifier).toLowerCase(), "subject"],
-		];
-	}
-
-	return [];
-}
-
-function isOpenAuthRecordOwnedByUser({
-	value,
-	userID,
-	subjects,
-}: {
-	value: unknown;
-	userID: string;
-	subjects: Set<string>;
-}): boolean {
-	if (!value || typeof value !== "object") return false;
-
-	const record = value as {
-		subject?: unknown;
-		properties?: {
-			id?: unknown;
-		};
-	};
-
-	return (
-		record.properties?.id === userID ||
-		(typeof record.subject === "string" && subjects.has(record.subject))
-	);
-}
-
-async function openAuthTableExists({
-	clientID,
-	env,
-}: {
-	clientID: string;
-	env: Env;
-}): Promise<boolean> {
-	const result = await env.AUTH_DB.prepare(
-		"SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-	)
-		.bind(clientID)
-		.first();
-
-	return Boolean(result);
-}
-
-async function cleanupOpenAuthStateForUser({
-	user,
-	clientID,
-	env,
-}: {
-	user: OTFUsersParsedType;
-	clientID: string;
-	env: Env;
-}) {
-	if (!(await openAuthTableExists({ clientID, env }))) {
-		return;
-	}
-
-	const storage = D1Storage({
-		database: env.AUTH_DB,
-		table: clientID,
-	}) as StorageAdapter;
-	const storageKeysToRemove = new Map<string, string[]>();
-	const knownSubjects = new Set<string>();
-	const addStorageKey = (key: string[]) => {
-		storageKeysToRemove.set(createStorageKeyFingerprint(key), key);
-	};
-
-	knownSubjects.add(
-		await resolveOpenAuthSubject(
-			"user",
-			buildIssuerSubjectPayload(user, clientID),
-		),
-	);
-
-	for (const key of getProviderStorageKeys(user)) {
-		addStorageKey(key);
-
-		if (key.at(-1) === "subject") {
-			const storedSubject = await storage.get(key);
-			if (typeof storedSubject === "string") {
-				knownSubjects.add(storedSubject);
-			}
-		}
-	}
-
-	for (const subject of knownSubjects) {
-		for await (const [key] of storage.scan(["oauth:refresh", subject])) {
-			addStorageKey(key);
-		}
-	}
-
-	for await (const [key, value] of storage.scan(["oauth:refresh"])) {
-		if (
-			isOpenAuthRecordOwnedByUser({
-				value,
-				userID: user.id,
-				subjects: knownSubjects,
-			})
-		) {
-			addStorageKey(key);
-		}
-	}
-
-	for await (const [key, value] of storage.scan(["oauth:code"])) {
-		if (
-			isOpenAuthRecordOwnedByUser({
-				value,
-				userID: user.id,
-				subjects: knownSubjects,
-			})
-		) {
-			addStorageKey(key);
-		}
-	}
-
-	for (const key of storageKeysToRemove.values()) {
-		await storage.remove(key);
-	}
-}
-
-async function cleanupUserLinkedRecords({
-	userID,
-	clientID,
-	env,
-}: {
-	userID: string;
-	clientID: string;
-	env: Env;
-}) {
-	const db = drizzle(env.AUTH_DB);
-
-	await db
-		.delete(totpTable)
-		.where(and(eq(totpTable.user_id, userID), eq(totpTable.clientID, clientID)))
-		.run();
-
-	await db
-		.delete(totpTokenTable)
-		.where(
-			and(
-				eq(totpTokenTable.user_id, userID),
-				eq(totpTokenTable.clientID, clientID),
-			),
-		)
-		.run();
-
-	await db
-		.delete(webauthnCredentialsTable)
-		.where(
-			and(
-				eq(webauthnCredentialsTable.user_id, userID),
-				eq(webauthnCredentialsTable.clientID, clientID),
-			),
-		)
-		.run();
-
-	await db
-		.delete(webAuthnTokenAccessTable)
-		.where(
-			and(
-				eq(webAuthnTokenAccessTable.user_id, userID),
-				eq(webAuthnTokenAccessTable.clientID, clientID),
-			),
-		)
-		.run();
-}
-
-async function deleteUserWithAuthState({
-	userID,
-	clientID,
-	env,
-}: {
-	userID: string;
-	clientID: string;
-	env: Env;
-}): Promise<
-	{ success: true } | { success: false; error: string; status: 404 | 400 }
-> {
-	const db = drizzle(env.AUTH_DB);
-	const userTable = OTFusersTable(clientID);
-	const rawUser = await db
-		.select()
-		.from(userTable)
-		.where(eq(userTable.id, userID))
-		.get();
-
-	if (!rawUser) {
-		return {
-			success: false,
-			error: "User not found",
-			status: 404,
-		};
-	}
-
-	const user = parseDBUser(rawUser) as OTFUsersParsedType;
-
-	await cleanupOpenAuthStateForUser({
-		user,
-		clientID,
-		env,
-	});
-	await cleanupUserLinkedRecords({
-		userID,
-		clientID,
-		env,
-	});
-
-	const deleteResult = await db
-		.delete(userTable)
-		.where(eq(userTable.id, userID))
-		.run();
-
-	if (!deleteResult.success) {
-		return {
-			success: false,
-			error: "Failed to delete user",
-			status: 400,
-		};
-	}
-
-	return { success: true };
 }
 
 function parseFilters(query: Record<string, string>): GetUserListFilters {
