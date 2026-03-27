@@ -40,7 +40,7 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
 			});
 
 			if (error.response) {
-				return new Response(error.response.body, {
+				return new Response((error.response.body as string) ?? "Error", {
 					...error.response.init,
 					status: error.status,
 				});

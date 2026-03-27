@@ -9,16 +9,14 @@ import type { EndpointCtx } from "./src/endpoints/types";
 export default async (_ctx: EndpointCtx, _project: Project) =>
 	createExternalGlobalProjectConfig<InferOutput<typeof subjects.user>>({
 		register: {
-			fallbackEmailFrom: "fallback@example.com",
+			fallbackEmailFrom: _ctx.env.EMAIL_FROM,
 			onSuccessfulRegistration(_ctx, _value, _request) {
 				//console.log(ctx, value);
 			},
 			strategy: {
 				email: {
-					provider: "custom",
-					sendEmailFunction(to, code) {
-						console.log(`Send code ${code} to email ${to}`);
-					},
+					provider: "resend",
+					apiKey: _ctx.env.RESEND_API_KEY,
 				},
 			},
 		},

@@ -73,7 +73,7 @@ function makeDeps(
 		writeFile: async (path, content) => {
 			written[path] = content;
 		},
-		fileExists: (path) => Promise.resolve(true),
+		fileExists: (_path) => Promise.resolve(true),
 		parseJSONC: (content) => JSON.parse(content),
 		// Default: return placeholder values unchanged (simulates user pressing Enter)
 		promptVars: async (vars) => ({ ...vars }),
@@ -165,7 +165,7 @@ describe("initializeFlow – git method", () => {
 			"wrangler d1 migrations apply AUTH_DB --remote",
 			"git remote set-url --push cloudflare https://github.com/example/repo.git",
 			"git add .",
-			`git commit -m "Initial commit"`,
+			`git commit -m "Initial-commit"`,
 			"git push cloudflare main",
 		]);
 	});
@@ -367,17 +367,19 @@ describe("initializeFlow – promptVars", () => {
 		});
 		await initializeFlow(deps, options);
 
-		expect(received).toEqual({
+		expect(received).toMatchObject({
 			WEBUI_ADMIN_EMAILS: "email1@example.com,email2@example.com",
 			WEBUI_ORIGIN_URL: "https://your-webui-domain.com",
 			ISSUER_URL: "https://your-issuer-domain.com",
 			LOG_ENABLED: "false",
+			"Cloudflare Worker name": "openauthster-issuer",
 			"db jurisdiction (e.g. eu, fedramp)": "eu",
 			"db location (e.g. weur, eeur, apac, oc, wnam, enam)": "enam",
 			"db name": "openauthster",
 			"Initialization method (wrangler/git)": "wrangler",
 			"Cloudflare API Token (with permissions to manage D1 databases)": "",
 		});
+		expect(received).toHaveProperty("account_id", undefined);
 	});
 
 	it("writes placeholder values when the user accepts defaults (returns vars unchanged)", async () => {
@@ -473,7 +475,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 		const wranglerJsonPath = join(cloneDir, "wrangler.json");
 
 		const deps: InitFlowDeps = {
-			exec: async (cmd) => ({ stdout: "", stderr: "" }),
+			exec: async (_cmd) => ({ stdout: "", stderr: "" }),
 			checkBinary: async () => true,
 			readFile: (path) =>
 				path.endsWith(".env")
@@ -482,7 +484,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 			writeFile: async (path, content) => {
 				await Bun.write(join(cloneDir, path.replace(/^\.?\//, "")), content);
 			},
-			fileExists: (path) => Promise.resolve(true),
+			fileExists: (_path) => Promise.resolve(true),
 			parseJSONC: (content) =>
 				Bun.JSONC.parse(content) as Record<string, unknown>,
 			promptVars: async (vars) => vars,
@@ -525,7 +527,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 				return { stdout: "", stderr: "" };
 			},
 			checkBinary: async () => true,
-			fileExists: (path) => Promise.resolve(true),
+			fileExists: (_path) => Promise.resolve(true),
 
 			readFile: (path) =>
 				pathFileContent[path as keyof typeof pathFileContent]
@@ -571,7 +573,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 				return { stdout: "", stderr: "" };
 			},
 			checkBinary: async () => true,
-			fileExists: (path) => Promise.resolve(true),
+			fileExists: (_path) => Promise.resolve(true),
 
 			readFile: (path) =>
 				Bun.file(join(cloneDir, path.replace(/^\.?\//, ""))).text(),
@@ -606,7 +608,7 @@ describe("initializeFlow – integration (real clone, mocked external commands)"
 			"wrangler d1 migrations apply AUTH_DB --remote",
 			`git remote set-url --push cloudflare ${REPO}`,
 			"git add .",
-			`git commit -m "Initial commit"`,
+			`git commit -m "Initial-commit"`,
 			"git push cloudflare main",
 		]);
 

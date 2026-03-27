@@ -38,34 +38,8 @@
 		"ACCESS_TTL": "900",
 		"REFRESH_TTL": "604800",
 		"WEBUI_SECRET": "aa9053c4-6e06-46f9-8359-95831d757427",
-		"RESEND_API_KEY": "re_7gB2cMGL_KEVh8TtqGdDYjDboX1u4Mmdg"
+		"RESEND_API_KEY": "re_7gB2cMGL_KEVh8TtqGdDYjDboX1u4Mmdg",
+		"EMAIL_FROM": "no-reply@webcreas.com"
 	},
-	"workers_dev": true,
-	"routes": [
-		{
-			"pattern": "4e74d4ca59114179b7810134616ebed8-auth-test.webcreas.com",
-			"zone_name": "webcreas.com",
-			"custom_domain": true
-		},
-		{
-			"pattern": "f630e0bb653a47ebb4c62bd791df62d8-auth-test.webcreas.com",
-			"zone_name": "webcreas.com",
-			"custom_domain": true
-		},
-		{
-			"pattern": "3bd3ba5069af448da0b3d80a244a9af4-auth-test.webcreas.com",
-			"zone_name": "webcreas.com",
-			"custom_domain": true
-		},
-		{
-			"pattern": "5905b08e65d241afa171a751b70685fd-auth-test.webcreas.com",
-			"zone_name": "webcreas.com",
-			"custom_domain": true
-		},
-		{
-			"pattern": "6761f3d22f844bfbb44b82cd0deb2bee-auth-test.webcreas.com",
-			"zone_name": "webcreas.com",
-			"custom_domain": true
-		}
-	]
+	"workers_dev": true
 }

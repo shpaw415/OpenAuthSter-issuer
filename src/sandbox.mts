@@ -1,4 +1,41 @@
 import type { QuickJSWASMModule } from "quickjs-emscripten";
+import { transform } from "sucrase";
+
+async function resolveWasmVariantOptions(
+	wasmImport: string | ArrayBuffer | ArrayBufferView | WebAssembly.Module,
+): Promise<
+	| { wasmBinary: ArrayBuffer; wasmModule?: never }
+	| { wasmBinary?: never; wasmModule: WebAssembly.Module }
+> {
+	if (wasmImport instanceof WebAssembly.Module) {
+		return { wasmModule: wasmImport };
+	}
+
+	if (wasmImport instanceof ArrayBuffer) {
+		return { wasmBinary: wasmImport };
+	}
+
+	if (ArrayBuffer.isView(wasmImport)) {
+		const bytes = new Uint8Array(wasmImport.byteLength);
+		bytes.set(
+			new Uint8Array(
+				wasmImport.buffer,
+				wasmImport.byteOffset,
+				wasmImport.byteLength,
+			),
+		);
+		return { wasmBinary: bytes.buffer };
+	}
+
+	const bunFile = globalThis.Bun?.file?.(wasmImport);
+	if (!bunFile) {
+		throw new Error(
+			`Unsupported WASM import value: expected bytes or module, received path ${wasmImport}`,
+		);
+	}
+
+	return { wasmBinary: await bunFile.arrayBuffer() };
+}
 
 // Initialize the QuickJS WASM VM once at module load.
 // In Cloudflare Workers (ES module format) and Bun, top-level await is supported.
@@ -12,12 +49,12 @@ export class SandBox {
 	}
 
 	private async init() {
-		const { newVariant, newQuickJSWASMModule, DEBUG_ASYNC } = await import(
+		const { newVariant, newQuickJSWASMModule, DEBUG_SYNC } = await import(
 			"quickjs-emscripten"
 		);
-		const cloudflareVariant = newVariant(DEBUG_ASYNC, {
-			//@ts-expect-error -- TypeScript doesn't understand how to type WASM imports, so we have to ignore the type error here.
-			wasmModule: (await import("./DEBUG_SYNC.wasm")).default,
+		const wasmModuleImport = (await import("./DEBUG_SYNC.wasm")).default;
+		const cloudflareVariant = newVariant(DEBUG_SYNC, {
+			...(await resolveWasmVariantOptions(wasmModuleImport)),
 			wasmSourceMapData: (await import("./DEBUG_SYNC.wasm.map.txt")).default,
 		});
 		this._qjs = await newQuickJSWASMModule(cloudflareVariant);
@@ -35,7 +72,9 @@ export class SandBox {
 			}
 
 			try {
-				const test = ctx.evalCode(`(function(props) { ${body} })`);
+				const test = ctx.evalCode(
+					`(function(props) { ${transform(body, { transforms: ["typescript"] }).code} })`,
+				);
 				if (test.error) {
 					const msg = ctx.dump(test.error);
 					test.error.dispose();
@@ -59,7 +98,7 @@ export class SandBox {
 			try {
 				// JSON.stringify produces only safe JSON literals (strings are always
 				// escaped), so this cannot be used for code injection.
-				const code = `(function(props) { ${body} })(${JSON.stringify(props)})`;
+				const code = `(function(props) { ${transform(body, { transforms: ["typescript"] }).code} })(${JSON.stringify(props)})`;
 				const result = ctx.evalCode(code);
 				if (result.error) {
 					const msg = ctx.dump(result.error);

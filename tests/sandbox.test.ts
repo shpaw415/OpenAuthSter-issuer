@@ -1,11 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import { createSandboxedFunction } from "../src/sandbox";
+import { SandBox } from "../src/sandbox.mts";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+const sb = await SandBox.create();
+
+const createSandboxedFunction = (body: string) =>
+	sb.createSandboxedFunction(body);
+
 /** Calls the sandboxed body with the given props and returns the result. */
 function run(body: string, props: Record<string, unknown> = {}): unknown {
-	return createSandboxedFunction(body)(props);
+	return sb.createSandboxedFunction(body)(props);
 }
 
 /**
@@ -165,7 +170,7 @@ describe("constructor chain escapes", () => {
 	it("Function constructor cannot return host eval", () => {
 		assertNotHostObject(
 			"return (function(){}).constructor('return eval')();",
-			globalThis.eval,
+			(globalThis as Record<string, unknown>)["eval"],
 		);
 	});
 
@@ -195,14 +200,14 @@ describe("prototype isolation", () => {
 	it("cannot pollute host Array.prototype", () => {
 		run(`try { Array.prototype["${poisonKey}"] = true; } catch(e) {}`);
 		expect(
-			(Array.prototype as Record<string, unknown>)[poisonKey],
+			(Array.prototype as unknown as Record<string, unknown>)[poisonKey],
 		).toBeUndefined();
 	});
 
 	it("cannot pollute host Function.prototype", () => {
 		run(`try { Function.prototype["${poisonKey}"] = true; } catch(e) {}`);
 		expect(
-			(Function.prototype as Record<string, unknown>)[poisonKey],
+			(Function.prototype as unknown as Record<string, unknown>)[poisonKey],
 		).toBeUndefined();
 	});
 });

@@ -132,6 +132,7 @@ async function sendCode({
 	emailTemplate,
 	type,
 	send_type,
+	ctx,
 }: {
 	code: string;
 	project: Project;
@@ -140,15 +141,30 @@ async function sendCode({
 	emailTemplate: EmailTemplateProps;
 	type: authCodeType;
 	send_type: "email" | "phone";
+	ctx: EndpointCtx;
 }) {
+	const mustache = (await import("mustache")).default;
+	const body = mustache.render(
+		emailTemplate.body,
+		await parseEmailTemplateProps({
+			...project.projectData,
+			code,
+			type,
+			AcceptLanguage: ctx.req.raw.headers.get("accept-language") || "",
+		}),
+	);
+
 	if (send_type === "email") {
+		const { inline } = await import("@css-inline/css-inline-wasm");
 		await sendCodeWithEmail({
 			code,
 			project,
 			to,
 			globalConfig,
 			emailTemplate,
+			emailBody: inline(body),
 			type,
+			ctx,
 		});
 	} else if (send_type === "phone") {
 		await sendCodeWithSMS({
@@ -156,8 +172,9 @@ async function sendCode({
 			project,
 			to,
 			globalConfig,
-			emailTemplateProps: emailTemplate,
+			smsBody: body,
 			type,
+			ctx,
 		});
 	}
 }
@@ -168,16 +185,17 @@ async function sendCodeWithEmail({
 	to,
 	globalConfig,
 	emailTemplate,
-	type,
+	emailBody,
 }: {
 	code: string;
 	project: Project;
 	to: string;
 	globalConfig: ExternalGlobalProjectConfig;
 	emailTemplate: EmailTemplateProps;
+	emailBody: string;
 	type: authCodeType;
+	ctx: EndpointCtx;
 }) {
-	const mustache = (await import("mustache")).default;
 	switch (globalConfig.register.strategy.email?.provider) {
 		case "resend": {
 			const apiKey = globalConfig.register.strategy.email.apiKey;
@@ -187,10 +205,7 @@ async function sendCodeWithEmail({
 				from: `${project.projectData.companyName || "Acme"} <${project.projectData?.emailFrom || globalConfig.register.fallbackEmailFrom}>`,
 				to: [to],
 				subject: emailTemplate.subject || "Your verification code",
-				html: mustache.render(
-					emailTemplate.body,
-					await parseEmailTemplateProps({ ...project.projectData, code, type }),
-				),
+				html: emailBody,
 			});
 			if (result.error) {
 				console.error(`Failed to send email to ${to}:`, result.error);
@@ -213,16 +228,17 @@ async function sendCodeWithSMS({
 	code,
 	to,
 	globalConfig,
-	emailTemplateProps,
-	project,
+	smsBody,
 	type,
+	ctx,
 }: {
 	code: string;
 	to: string;
 	globalConfig: ExternalGlobalProjectConfig;
-	emailTemplateProps: EmailTemplateProps;
+	smsBody: string;
 	project: Project;
 	type: authCodeType;
+	ctx: EndpointCtx;
 }) {
 	switch (globalConfig.register.strategy.phone?.provider) {
 		case "twilio": {
@@ -232,10 +248,7 @@ async function sendCodeWithSMS({
 				authToken: twilioConfig.authToken,
 				to,
 				from: twilioConfig.fromNumber,
-				body: (await import("mustache")).default.render(
-					emailTemplateProps.body,
-					await parseEmailTemplateProps({ ...project.projectData, code, type }),
-				),
+				body: smsBody,
 			});
 			console.log("Twilio SMS log:", res);
 			break;
@@ -245,6 +258,7 @@ async function sendCodeWithSMS({
 				to,
 				code,
 				type,
+				ctx,
 			);
 			break;
 		default:
@@ -384,10 +398,6 @@ const passwordConfigBuilder: ConfigType<
 						code,
 						type: "change" | "register" | undefined,
 					) => {
-						if (project.codeMode === "phone")
-							console.warn(
-								"Project is set to phone code mode, but password provider is only supporting sending code via email.",
-							);
 						await sendCode({
 							to: email,
 							code,
@@ -397,10 +407,14 @@ const passwordConfigBuilder: ConfigType<
 								type === "change" ? "change_password" : (type ?? "register"),
 							emailTemplate: await getEmailTemplate({
 								env,
-								id: project.emailTemplateId,
+								id:
+									type === "register"
+										? providerConfig.data.registerTemplateId
+										: providerConfig.data.resetPasswordTemplateId,
 								project,
 							}),
 							send_type: "email",
+							ctx,
 						}).then(() => {
 							// Trigger webhooks for code_sent event
 							return new WebHook({ db: env.AUTH_DB }).trigger({
@@ -409,7 +423,7 @@ const passwordConfigBuilder: ConfigType<
 								secret: project.secret,
 								data: {
 									code,
-									method: project.codeMode,
+									method: "email",
 									send_to: email,
 									provider: "password",
 								},
@@ -426,32 +440,26 @@ const passwordConfigBuilder: ConfigType<
 							requireSpecialChar,
 						} = providerConfig.data;
 						const {
-							shortPasswordMsg,
-							requireUppercaseMsg,
-							requireNumberMsg,
-							requireSpecialCharMsg,
-						} = providerConfig.data;
+							shortPasswordMsg = `Password must be at least ${minLength} characters.`,
+							requireUppercaseMsg = "Password must contain an uppercase letter.",
+							requireNumberMsg = "Password must contain a number.",
+							requireSpecialCharMsg = "Password must contain a special character.",
+						} = copyTemplate?.copyData.password || {};
 						if (minLength) {
 							if (password.length < minLength)
-								return shortPasswordMsg || "Password is too short.";
+								return shortPasswordMsg.replace("{min}", minLength.toString());
 							else if (
 								requireUppercase &&
 								password === password.toLocaleLowerCase()
 							)
-								return (
-									requireUppercaseMsg ||
-									"Password must contain an uppercase letter."
-								);
+								return requireUppercaseMsg;
 							else if (requireNumber && !/\d/.test(password))
-								return requireNumberMsg || "Password must contain a number.";
+								return requireNumberMsg;
 							else if (
 								requireSpecialChar &&
 								!/[!@#$%^&*(),.?":{}|<>]/.test(password)
 							)
-								return (
-									requireSpecialCharMsg ||
-									"Password must contain a special character."
-								);
+								return requireSpecialCharMsg;
 						}
 					},
 				}),
@@ -500,10 +508,17 @@ const codeConfigBuilder: ConfigType<
 	},
 	{ email?: string; phone?: string }
 > = {
-	provider: async ({ env, globalConfig, project, copyTemplate, ctx }) => {
+	provider: async ({
+		env,
+		globalConfig,
+		project,
+		copyTemplate,
+		ctx,
+		providerConfig,
+	}) => {
 		const codeUI = (await import("@kagii/openauth/ui/code")).CodeUI({
 			copy: copyTemplate?.copyData.code,
-			mode: project.codeMode,
+			mode: providerConfig.data.codeMode,
 			sendCode: async (claim, code) => {
 				await sendCode({
 					code,
@@ -512,11 +527,12 @@ const codeConfigBuilder: ConfigType<
 					globalConfig,
 					emailTemplate: await getEmailTemplate({
 						env,
-						id: project.emailTemplateId,
+						id: providerConfig.data.registerTemplateId,
 						project,
 					}),
 					type: "login",
 					send_type: claim.email ? "email" : "phone",
+					ctx,
 				}).then(() => {
 					// Trigger webhooks for code_sent event
 					return new WebHook({ db: env.AUTH_DB }).trigger({
@@ -525,7 +541,7 @@ const codeConfigBuilder: ConfigType<
 						secret: project.secret,
 						data: {
 							code,
-							method: project.codeMode,
+							method: providerConfig.data.codeMode,
 							send_to: claim.email || claim.phone,
 							provider: "code",
 						},
@@ -1287,8 +1303,9 @@ async function generateProvidersFromConfig({
 		project,
 	);
 
-	const providers = (
-		await Promise.all(
+	const providers = Object.assign(
+		{},
+		...(await Promise.all(
 			project.providers_data
 				.filter((p) => p.enabled)
 				.map(async (providerConfig) => {
@@ -1309,8 +1326,8 @@ async function generateProvidersFromConfig({
 						}),
 					};
 				}),
-		)
-	).reduce((acc, curr) => ({ ...acc, ...curr }), {});
+		)),
+	) as Record<string, Provider<unknown>>;
 	return providers;
 }
 

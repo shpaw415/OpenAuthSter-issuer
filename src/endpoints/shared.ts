@@ -2,7 +2,7 @@ import type { Project } from "openauth-webui-shared-types";
 
 export function getTokenFromRequest(request: Request): string | null {
 	const header = request.headers.get("Authorization");
-	if (!header || !header.startsWith("Bearer ")) {
+	if (!header?.startsWith("Bearer ")) {
 		return null;
 	}
 	return header.slice("Bearer ".length).trim();

@@ -15,7 +15,7 @@
 		"publish": true
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.7",
+		"@biomejs/biome": "^2.4.7",
 		"@cloudflare/workers-types": "^4.20260317.1",
 		"@types/bun": "latest",
 		"@types/mustache": "^4.2.6",
@@ -28,6 +28,7 @@
 		"wrangler": "4.67.0"
 	},
 	"dependencies": {
+		"@css-inline/css-inline-wasm": "^0.20.1",
 		"@kagii/openauth": "^0.6.0",
 		"@simplewebauthn/server": "^13.3.0",
 		"@types/semver": "^7.7.1",
@@ -45,6 +46,7 @@
 		"resend": "^6.9.4",
 		"semver": "^7.7.4",
 		"semver-compare": "^1.0.0",
+		"sucrase": "^3.35.1",
 		"valibot": "1.2.0"
 	},
 	"private": true,
@@ -57,7 +59,8 @@
 		"git:deploy": "git push cloudflare setup",
 		"git:upgrade": "git pull origin main && git merge origin main && bun update openauth-webui-shared-types",
 		"update:share": "bun update openauth-webui-shared-types",
-		"cli": "bun run ./bin/index.ts"
+		"cli": "bun run ./bin/index.ts",
+		"biome": "biome check"
 	},
 	"exports": {
 		".": "./src/index.ts",

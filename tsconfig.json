@@ -19,5 +19,6 @@
 		"skipLibCheck": true,
 		"strict": true
 	},
-	"include": ["src", "./openauth.config.ts", "bin", "tests"]
+	"include": ["src", "./openauth.config.ts", "bin", "tests"],
+	"exclude": ["./node_modules"]
 }

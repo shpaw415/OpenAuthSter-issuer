@@ -51,12 +51,11 @@ export class RequestError extends Error {
 		this.project = project;
 		this.endpoint = endpoint;
 		this.log = log;
-		this.token = getTokenFromRequest(request) ? true : false;
-		this.secret =
+		this.token = Boolean(getTokenFromRequest(request));
+		this.secret = Boolean(
 			request.headers.get("X-Client-Signature") &&
-			request.headers.get("X-Client-Timestamp")
-				? true
-				: false;
+				request.headers.get("X-Client-Timestamp"),
+		);
 		this.response = responseInit ? responseInit : null;
 	}
 }
