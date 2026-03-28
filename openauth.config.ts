@@ -1,4 +1,4 @@
-import { PUBLIC_CLIENT_ID, type Project } from "openauth-webui-shared-types";
+import { type Project, PUBLIC_CLIENT_ID } from "openauth-webui-shared-types";
 import { defaultSubjectSchema } from "openauth-webui-shared-types/client/user";
 import type { InferOutput } from "valibot";
 import type { EndpointCtx } from "./src/endpoints/types";
@@ -31,6 +31,7 @@ export default async (request_ctx: EndpointCtx, project: Project) =>
 				email: {
 					provider: "resend",
 					apiKey: request_ctx.env.RESEND_API_KEY,
+					emailFrom: request_ctx.env.EMAIL_FROM,
 				},
 			},
 		},

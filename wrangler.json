@@ -37,9 +37,7 @@
 		"LOG_ENABLED": "true",
 		"ACCESS_TTL": "900",
 		"REFRESH_TTL": "604800",
-		"WEBUI_SECRET": "aa9053c4-6e06-46f9-8359-95831d757427",
-		"RESEND_API_KEY": "re_7gB2cMGL_KEVh8TtqGdDYjDboX1u4Mmdg",
-		"EMAIL_FROM": "no-reply@webcreas.com"
+		"EMAIL_FROM": "no-reply@mail.webcreas.com"
 	},
 	"workers_dev": true
 }

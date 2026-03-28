@@ -1,8 +1,8 @@
 {
 	"version": "6",
 	"dialect": "sqlite",
-	"id": "158f8fb7-0cd7-4651-96fb-42b43156273a",
-	"prevId": "404396c9-ff35-4afb-a330-8b52606aeb26",
+	"id": "b7e2307e-f76b-479e-99fe-5a214fc0051f",
+	"prevId": "158f8fb7-0cd7-4651-96fb-42b43156273a",
 	"tables": {
 		"openauth_webui_logs": {
 			"name": "openauth_webui_logs",
@@ -51,17 +51,7 @@
 				}
 			},
 			"indexes": {},
-			"foreignKeys": {
-				"openauth_webui_logs_clientID_openauth_webui_projects_clientID_fk": {
-					"name": "openauth_webui_logs_clientID_openauth_webui_projects_clientID_fk",
-					"tableFrom": "openauth_webui_logs",
-					"tableTo": "openauth_webui_projects",
-					"columnsFrom": ["clientID"],
-					"columnsTo": ["clientID"],
-					"onDelete": "no action",
-					"onUpdate": "no action"
-				}
-			},
+			"foreignKeys": {},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
 			"checkConstraints": {}

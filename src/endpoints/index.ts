@@ -41,6 +41,7 @@ import type {
 } from "openauth-webui-shared-types/client/user";
 // OpenAuthster shared imports
 import {
+	createWebUiProject,
 	insertLog,
 	OTFusersTable,
 	parseDBUser,
@@ -59,6 +60,7 @@ import {
 	type UserResponseSchemaType,
 } from "openauth-webui-shared-types/endpoints";
 import { createSelfClient } from "openauth-webui-shared-types/providers/utils";
+import { deleteUserWithAuthState } from "openauth-webui-shared-types/user/delete";
 import { getCookiesFromRequest } from "openauth-webui-shared-types/utils";
 import { WebHook } from "openauth-webui-shared-types/webhook";
 import type { WebHookEvents } from "openauth-webui-shared-types/webhook/types";
@@ -80,7 +82,6 @@ import { IniviteManager } from "./invite";
 import { encryptData, verifyData } from "./security";
 import { getSecretFromRequest, getTokenFromRequest } from "./shared";
 import type { EndpointCtx, EndpointVariables, Params } from "./types";
-import { deleteUserWithAuthState } from "openauth-webui-shared-types/user/delete";
 
 export const endpoints = new Hono<{
 	Bindings: Env;
@@ -2071,7 +2072,7 @@ endpoints.all("*", async (c) => {
 			const logger = insertLog({
 				type: "info",
 				message: `User ${userData.parser.id} ${userData.type} successfully with provider ${value.provider}`,
-				clientID: project?.clientID ?? "unknown",
+				clientID: project.clientID,
 				context: {
 					provider: value.provider,
 					userID: userData.parser.id,
@@ -2096,7 +2097,7 @@ endpoints.all("*", async (c) => {
 			insertLog({
 				type: "error",
 				message: `Authentication error: ${(error as Error).message}`,
-				clientID: project?.clientID ?? "unknown",
+				clientID: project.clientID,
 				context: {
 					error: error instanceof Error ? error.message : String(error),
 				},
@@ -2153,28 +2154,10 @@ async function getProjectById(
 	env: Env,
 ): Promise<null | Project> {
 	if (clientId === PUBLIC_CLIENT_ID) {
-		return {
-			theme_id: null,
-			name: "openauthster webui",
-			owner_id: "admin",
-			owner_group_id: "admin",
-			projectData: {},
-			active: true,
-			clientID: PUBLIC_CLIENT_ID,
-			created_at: new Date().toISOString(),
-			registerOnInvite: false,
-			secret: env.WEBUI_SECRET,
-			authEndpointURL: "",
-			cloudflareDomaineID: "",
+		return createWebUiProject({
 			originURL: env.WEBUI_ORIGIN_URL,
-			providers_data: [
-				{
-					type: "password",
-					enabled: true,
-					data: {},
-				},
-			],
-		} satisfies Project;
+			secret: env.WEBUI_SECRET,
+		});
 	}
 
 	if (!clientId) return null;

@@ -1,3 +1,5 @@
+import { initWasm, inline as inlineCss } from "@css-inline/css-inline-wasm";
+import cssInlineWasm from "@css-inline/css-inline-wasm/index_bg.wasm";
 import type { Provider } from "@kagii/openauth/provider/provider";
 import { PasswordUI } from "@kagii/openauth/ui/password";
 import type { JWTPayload } from "jose";
@@ -8,7 +10,6 @@ import type {
 	CodeProviderConfig,
 	CognitoProviderConfig,
 	EmailTemplateProps,
-	ExternalGlobalProjectConfig,
 	GenericOAuthProviderConfig,
 	GoogleProviderConfig,
 	KeycloakProviderConfig,
@@ -30,11 +31,10 @@ import {
 import { and, drizzle, eq } from "openauth-webui-shared-types/drizzle";
 import type { QRProviderOnSuccessData } from "openauth-webui-shared-types/providers/custom/qr/index.ts";
 import { WebHook } from "openauth-webui-shared-types/webhook";
-import { initWasm, inline as inlineCss } from "@css-inline/css-inline-wasm";
-import cssInlineWasm from "@css-inline/css-inline-wasm/index_bg.wasm";
 import getGlobalConfig from "../openauth.config";
 import DefaultEmailTemplateBody from "./defaults/email";
 import type { EndpointCtx } from "./endpoints/types.ts";
+import type { ExternalGlobalProjectConfig } from "./global-conf.ts";
 import { SandBox } from "./sandbox.mts";
 import { toAuthorizeOrigin } from "./share.ts";
 
@@ -173,7 +173,6 @@ async function sendCode({
 			emailTemplate,
 			emailBody: inlineCss(body),
 			type,
-			ctx,
 		});
 	} else if (send_type === "phone") {
 		await sendCodeWithSMS({
@@ -183,7 +182,6 @@ async function sendCode({
 			globalConfig,
 			smsBody: body,
 			type,
-			ctx,
 		});
 	}
 }
@@ -195,6 +193,7 @@ async function sendCodeWithEmail({
 	globalConfig,
 	emailTemplate,
 	emailBody,
+	type,
 }: {
 	code: string;
 	project: Project;
@@ -203,7 +202,6 @@ async function sendCodeWithEmail({
 	emailTemplate: EmailTemplateProps;
 	emailBody: string;
 	type: authCodeType;
-	ctx: EndpointCtx;
 }) {
 	switch (globalConfig.register.strategy.email?.provider) {
 		case "resend": {
@@ -211,7 +209,7 @@ async function sendCodeWithEmail({
 			const result = await new (await import("resend")).Resend(
 				apiKey,
 			).emails.send({
-				from: `${project.projectData.companyName || "Acme"} <${project.projectData?.emailFrom || globalConfig.register.fallbackEmailFrom}>`,
+				from: `${project.projectData.companyName || "Acme"} <${project.projectData?.emailFrom ?? globalConfig.register.strategy?.email?.emailFrom ?? globalConfig.register.fallbackEmailFrom}>`,
 				to: [to],
 				subject: emailTemplate.subject || "Your verification code",
 				html: emailBody,
@@ -228,6 +226,15 @@ async function sendCodeWithEmail({
 
 			break;
 		}
+		case "custom":
+			await globalConfig.register.strategy.email.sendEmailFunction({
+				to,
+				code,
+				body: emailBody,
+				subject: emailTemplate.subject || "Your verification code",
+				type,
+			});
+			break;
 		// Add other strategies as needed
 		default:
 			console.log(`Sending code ${code} to ${to} via default method`);
@@ -239,7 +246,6 @@ async function sendCodeWithSMS({
 	globalConfig,
 	smsBody,
 	type,
-	ctx,
 }: {
 	code: string;
 	to: string;
@@ -247,7 +253,6 @@ async function sendCodeWithSMS({
 	smsBody: string;
 	project: Project;
 	type: authCodeType;
-	ctx: EndpointCtx;
 }) {
 	switch (globalConfig.register.strategy.phone?.provider) {
 		case "twilio": {
@@ -263,12 +268,13 @@ async function sendCodeWithSMS({
 			break;
 		}
 		case "custom":
-			await globalConfig.register.strategy.phone.sendSMSFunction(
+			await globalConfig.register.strategy.phone.sendSMSFunction({
 				to,
 				code,
 				type,
-				ctx,
-			);
+				body: smsBody,
+				subject: "",
+			});
 			break;
 		default:
 			console.log(`Sending code ${code} to ${to} via default SMS method`);
