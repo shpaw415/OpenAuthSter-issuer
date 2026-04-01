@@ -2359,23 +2359,25 @@ async function getOrCreateUser({
 		...(userData.data ?? exists?.data ?? {}),
 		provider: exists?.data?.provider || value.provider,
 	};
-	const userResult = await drizzle(env.AUTH_DB)
-		.insert(usersTable)
-		.values({
-			id: crypto.randomUUID(),
-			identifier: userData.identifier,
-			data: dataToStore,
-			created_at: new Date().toISOString(),
-		})
-		.onConflictDoUpdate({
-			target: usersTable.identifier,
-			set: {
+	const userResult =
+		exists ??
+		(await drizzle(env.AUTH_DB)
+			.insert(usersTable)
+			.values({
+				id: crypto.randomUUID(),
+				identifier: userData.identifier,
 				data: dataToStore,
-			},
-		})
-		.returning()
-		.then((r) => r.at(0))
-		.then((res) => res ?? undefined);
+				created_at: new Date().toISOString(),
+			})
+			.onConflictDoUpdate({
+				target: usersTable.identifier,
+				set: {
+					data: dataToStore,
+				},
+			})
+			.returning()
+			.then((r) => r.at(0))
+			.then((res) => res ?? undefined));
 
 	if (!userResult) {
 		throw new RequestError({
