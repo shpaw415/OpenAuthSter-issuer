@@ -2294,12 +2294,27 @@ async function getThemeFromProject(project: Project, env: Env): Promise<Theme> {
 		});
 }
 
-async function userExists(env: Env, identifier: string, clientID: string) {
+async function userExists({
+	env,
+	identifier,
+	clientID,
+	email,
+}: {
+	env: Env;
+	identifier: string;
+	clientID: string;
+	email?: string;
+}) {
 	const usersTable = OTFusersTable(clientID);
 	return drizzle(env.AUTH_DB)
 		.select()
 		.from(usersTable)
-		.where(eq(usersTable.identifier, identifier))
+		.where(
+			or(
+				eq(usersTable.identifier, identifier),
+				...(email ? [eq(usersTable.email, email)] : []),
+			),
+		)
 		.limit(1)
 		.get()
 		.then((res) => res ?? undefined);
@@ -2329,7 +2344,12 @@ async function getOrCreateUser({
 		value.provider as keyof typeof providerConfigMap
 	].parser(value, providerConfig, env, ctx);
 
-	const exists = await userExists(env, userData.identifier, project.clientID);
+	const exists = await userExists({
+		env,
+		identifier: userData.identifier,
+		clientID: project.clientID,
+		email: userData.data?.email,
+	});
 
 	const inviteHelper = new IniviteManager(env, project, ctx);
 
