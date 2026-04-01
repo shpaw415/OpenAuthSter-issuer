@@ -19,7 +19,7 @@ export class IniviteManager {
 		private Project: Project,
 		private ctx: EndpointCtx,
 	) {
-		this.inviteLinkEnabled = Project.registerOnInvite;
+		this.inviteLinkEnabled = Boolean(Project.registerOnInvite);
 		this.request = ctx.req.raw;
 	}
 

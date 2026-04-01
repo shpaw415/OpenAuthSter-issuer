@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { SandBox } from "../src/sandbox.mts";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const sb = await SandBox.create();
+let sb: SandBox;
 
 const createSandboxedFunction = (body: string) =>
 	sb.createSandboxedFunction(body);
@@ -32,6 +32,10 @@ function assertNotHostObject(
 		expect(e).toBeInstanceOf(Error);
 	}
 }
+
+beforeAll(async () => {
+	sb = await SandBox.create();
+});
 
 // ─── Functional correctness ──────────────────────────────────────────────────
 

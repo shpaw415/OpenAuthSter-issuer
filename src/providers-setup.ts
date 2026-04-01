@@ -209,7 +209,7 @@ async function sendCodeWithEmail({
 			const result = await new (await import("resend")).Resend(
 				apiKey,
 			).emails.send({
-				from: `${project.projectData.companyName || "Acme"} <${project.projectData?.emailFrom ?? globalConfig.register.strategy?.email?.emailFrom ?? globalConfig.register.fallbackEmailFrom}>`,
+				from: `${project.projectData?.companyName || "Acme"} <${project.projectData?.emailFrom ?? globalConfig.register.strategy?.email?.emailFrom ?? globalConfig.register.fallbackEmailFrom}>`,
 				to: [to],
 				subject: emailTemplate.subject || "Your verification code",
 				html: emailBody,
@@ -283,16 +283,20 @@ async function sendCodeWithSMS({
 }
 
 export async function parseEmailTemplateProps(
-	emailProps?: Record<string, string | undefined>,
+	emailProps?: Record<string, string | string[] | undefined>,
 ): Promise<Record<string, unknown>> {
 	if (!emailProps) return {};
 	let _sandbox: SandBox | undefined;
-	if (Object.values(emailProps).some((v) => v?.startsWith("function::")))
+	if (
+		Object.values(emailProps).some(
+			(v) => typeof v === "string" && v.startsWith("function::"),
+		)
+	)
 		_sandbox = await SandBox.create();
 	return Object.fromEntries(
 		Object.entries(emailProps).map(([key, value]) => {
 			if (!value) return [key, value];
-			if (value.startsWith("function::")) {
+			if (typeof value === "string" && value.startsWith("function::")) {
 				const body = value.replace("function::", "");
 				const sandboxed = _sandbox?.createSandboxedFunction(body);
 				return [key, () => sandboxed?.(emailProps as Record<string, unknown>)];
@@ -408,18 +412,13 @@ const passwordConfigBuilder: ConfigType<
 		import("@kagii/openauth/provider/password").then(async (mod) =>
 			mod.PasswordProvider(
 				PasswordUI({
-					sendCode: async (
-						email,
-						code,
-						type: "change" | "register" | undefined,
-					) => {
+					sendCode: async (email, code, type) => {
 						await sendCode({
 							to: email,
 							code,
 							globalConfig,
 							project,
-							type:
-								type === "change" ? "change_password" : (type ?? "register"),
+							type: type === "change" ? "change_password" : type,
 							emailTemplate: await getEmailTemplate({
 								env,
 								id:
@@ -1318,29 +1317,31 @@ async function generateProvidersFromConfig({
 		project,
 	);
 
+	const providerData =
+		project.providers_data?.filter((p) => p.enabled).filter((p) => p.enabled) ||
+		[];
+
 	const providers = Object.assign(
 		{},
 		...(await Promise.all(
-			project.providers_data
-				.filter((p) => p.enabled)
-				.map(async (providerConfig) => {
-					return {
-						[providerConfig.type]: await providerConfigMap[
-							providerConfig.type
-						].provider({
+			providerData.map(async (providerConfig) => {
+				return {
+					[providerConfig.type]: await providerConfigMap[
+						providerConfig.type
+					].provider({
+						env,
+						globalConfig,
+						project,
+						providerConfig,
+						copyTemplate: await getCopyTemplateFromName({
+							name: copyTemplateName ?? null,
 							env,
-							globalConfig,
 							project,
-							providerConfig,
-							copyTemplate: await getCopyTemplateFromName({
-								name: copyTemplateName ?? null,
-								env,
-								project,
-							}),
-							ctx,
 						}),
-					};
-				}),
+						ctx,
+					}),
+				};
+			}),
 		)),
 	) as Record<string, Provider<unknown>>;
 	return providers;

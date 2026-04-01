@@ -25,7 +25,6 @@ import {
 	type ProviderConfig,
 	type ProviderType,
 	PUBLIC_CLIENT_ID,
-	parseDBProject,
 	totpTable,
 } from "openauth-webui-shared-types";
 import type { TotpError } from "openauth-webui-shared-types/client/errors";
@@ -44,9 +43,7 @@ import {
 	createWebUiProject,
 	insertLog,
 	OTFusersTable,
-	parseDBUser,
 	projectTable,
-	serializeDBUser,
 	totpTokenTable,
 	uiStyleTable,
 	webauthnChallengesTable,
@@ -57,7 +54,7 @@ import { and, drizzle, eq, or } from "openauth-webui-shared-types/drizzle";
 import {
 	type GetUserListFilters,
 	UserListSchemaValidation,
-	type UserResponseSchemaType,
+	type UserResponseSchemaType as _UserResponseSchemaType,
 } from "openauth-webui-shared-types/endpoints";
 import { createSelfClient } from "openauth-webui-shared-types/providers/utils";
 import { deleteUserWithAuthState } from "openauth-webui-shared-types/user/delete";
@@ -82,6 +79,13 @@ import { IniviteManager } from "./invite";
 import { encryptData, verifyData } from "./security";
 import { getSecretFromRequest, getTokenFromRequest } from "./shared";
 import type { EndpointCtx, EndpointVariables, Params } from "./types";
+
+type UserResponseSchemaType = _UserResponseSchemaType<
+	Record<string, unknown>,
+	Record<string, unknown>,
+	Record<string, unknown>,
+	string
+>;
 
 export const endpoints = new Hono<{
 	Bindings: Env;
@@ -257,7 +261,7 @@ endpoints.use("/qr/validate", async (c, next) => {
 	const project = c.get("project");
 
 	if (!project) return c.json({ error: "Project not found" }, 404);
-	const qrProviderConfig = project.providers_data.find((p) => p.type === "qr");
+	const qrProviderConfig = project.providers_data?.find((p) => p.type === "qr");
 	if (!qrProviderConfig?.data.requireMFA) return next();
 	c.set("requireMFA", true);
 	return next();
@@ -292,7 +296,7 @@ async function requestToParams(request: Request, env: Env): Promise<Params> {
 			.get();
 		if (project) {
 			clientIDParams = project.clientID;
-			setProjectToCache(parseDBProject(project));
+			setProjectToCache(project);
 		}
 	}
 
@@ -338,6 +342,60 @@ endpoints.use("/user/*", user_users_endpoints_middleware);
 endpoints.use("/users/*", user_users_endpoints_middleware);
 endpoints.use("/users", user_users_endpoints_middleware);
 
+endpoints.put("/user/role", async (c) => {
+	const { clientID } = c.get("project");
+
+	console.log("Received request to update user role", {
+		body: await c.req.text(),
+		url: c.req.url,
+	});
+
+	const { user_id, role } = (await c.req.json()) as {
+		user_id: string;
+		role: string;
+	};
+
+	if (!role) {
+		return c.json({ error: "Role is required" }, 400);
+	} else if (!user_id) {
+		return c.json({ error: "User ID is required" }, 400);
+	}
+
+	const db = drizzle(c.env.AUTH_DB);
+	try {
+		const userTable = OTFusersTable(clientID);
+		const [userData] = await db
+			.update(userTable)
+			.set({ role })
+			.where(eq(userTable.id, user_id))
+			.returning();
+
+		if (!userData) {
+			return c.json({ error: "User not found" }, 404);
+		}
+
+		const responseBody: UserResponseSchemaType = {
+			success: true,
+			data: {
+				total: 1,
+				users: [userData],
+			},
+			error: null,
+		};
+
+		return c.json(responseBody, 200);
+	} catch (err) {
+		throw new RequestError({
+			message: err instanceof Error ? err.message : String(err),
+			status: err instanceof RequestError ? err.status : 500,
+			endpoint: "/user/role",
+			params: c.get("params"),
+			project: c.get("project"),
+			request: c.req.raw,
+		});
+	}
+});
+
 /**
  * Manage single user by userID and clientID
  * Endpoints:
@@ -361,7 +419,7 @@ endpoints
 			return c.json(
 				parse(UserListSchemaValidation, {
 					success: true,
-					data: { users: [parseDBUser(user) as OTFUsersParsedType], total: 1 },
+					data: { users: [user], total: 1 },
 					error: null,
 				} satisfies UserResponseSchemaType),
 			);
@@ -381,11 +439,7 @@ endpoints
 						success: false,
 						data: null as unknown as UserResponseSchemaType["data"],
 						error: err instanceof Error ? err.message : String(err),
-					} satisfies UserResponseSchemaType<
-						Record<string, unknown>,
-						Record<string, unknown>,
-						Record<string, unknown>
-					>),
+					} satisfies UserResponseSchemaType),
 				},
 			});
 		}
@@ -405,12 +459,12 @@ endpoints
 			];
 			const filteredData = Object.fromEntries(
 				Object.entries(newData).filter(([key]) => allowedFields.includes(key)),
-			) as Partial<OTFUsersParsedType>;
+			) as Partial<ReturnType<typeof OTFusersTable>["$inferSelect"]>;
 			const userTable = OTFusersTable(clientID);
 
 			const user = await drizzle(c.env.AUTH_DB)
 				.update(userTable)
-				.set(serializeDBUser(filteredData))
+				.set(filteredData)
 				.where(eq(userTable.id, userID))
 				.returning()
 				.get();
@@ -420,7 +474,7 @@ endpoints
 			return c.json(
 				parse(UserListSchemaValidation, {
 					success: true,
-					data: { users: [parseDBUser(user) as OTFUsersParsedType], total: 1 },
+					data: { users: [user], total: 1 },
 					error: null,
 				} satisfies UserResponseSchemaType),
 			);
@@ -551,7 +605,7 @@ endpoints
 				parse(UserListSchemaValidation, {
 					success: true,
 					data: {
-						users: user.map(parseDBUser) as Array<OTFUsersParsedType>,
+						users: user,
 						total: user.length,
 					},
 					error: null,
@@ -573,11 +627,7 @@ endpoints
 						success: false,
 						data: null as unknown as UserResponseSchemaType["data"],
 						error: err instanceof Error ? err.message : String(err),
-					} satisfies UserResponseSchemaType<
-						Record<string, unknown>,
-						Record<string, unknown>,
-						Record<string, unknown>
-					>),
+					} satisfies UserResponseSchemaType),
 				},
 			});
 		}
@@ -2046,7 +2096,7 @@ endpoints.all("*", async (c) => {
 			const userData = await getOrCreateUser({
 				env: c.env,
 				value,
-				providerConfig: project?.providers_data.find(
+				providerConfig: project?.providers_data?.find(
 					(p) => p.type === value.provider,
 				) as ProviderConfig,
 				project: project,
@@ -2092,6 +2142,30 @@ endpoints.all("*", async (c) => {
 			});
 
 			return Promise.all([logger, res]).then(([_, res]) => res);
+		},
+		refresh: async (ctx, value) => {
+			const userTable = OTFusersTable(project.clientID);
+			const user = await drizzle(c.env.AUTH_DB)
+				.select({ role: userTable.role })
+				.from(userTable)
+				.where(eq(userTable.id, value.properties.id))
+				.get();
+
+			if (!user) {
+				throw new RequestError({
+					message: "User not found during token refresh",
+					status: 404,
+					endpoint: new URL(c.req.raw.url).pathname,
+					params,
+					project,
+					request: c.req.raw,
+				});
+			}
+
+			return ctx.subject("user", {
+				...value.properties,
+				role: user.role,
+			});
 		},
 		async error(error, req) {
 			insertLog({
@@ -2167,15 +2241,14 @@ async function getProjectById(
 		return cachedProject;
 	}
 
-	const projectData = await drizzle(env.AUTH_DB)
+	const project = await drizzle(env.AUTH_DB)
 		.select()
 		.from(projectTable)
 		.where(eq(projectTable.clientID, clientId))
 		.get();
 
-	if (!projectData) return null;
+	if (!project) return null;
 
-	const project = parseDBProject(projectData);
 	setCache<Project>(clientId, project);
 	return project;
 }
@@ -2189,15 +2262,14 @@ async function getProjectByHost(url: URL, env: Env): Promise<null | Project> {
 		return cachedProject;
 	}
 
-	const projectData = await drizzle(env.AUTH_DB)
+	const project = await drizzle(env.AUTH_DB)
 		.select()
 		.from(projectTable)
 		.where(eq(projectTable.authEndpointURL, url.hostname))
 		.get();
 
-	if (!projectData) return null;
+	if (!project) return null;
 
-	const project = parseDBProject(projectData);
 	setCache<Project>(project.clientID, project);
 	return project;
 }
@@ -2230,7 +2302,7 @@ async function userExists(env: Env, identifier: string, clientID: string) {
 		.where(eq(usersTable.identifier, identifier))
 		.limit(1)
 		.get()
-		.then((res) => (res ? parseDBUser(res) : undefined));
+		.then((res) => res ?? undefined);
 }
 
 async function getOrCreateUser({
@@ -2272,18 +2344,18 @@ async function getOrCreateUser({
 		.values({
 			id: crypto.randomUUID(),
 			identifier: userData.identifier,
-			data: JSON.stringify(dataToStore),
+			data: dataToStore,
 			created_at: new Date().toISOString(),
 		})
 		.onConflictDoUpdate({
 			target: usersTable.identifier,
 			set: {
-				data: JSON.stringify(dataToStore),
+				data: dataToStore,
 			},
 		})
 		.returning()
 		.then((r) => r.at(0))
-		.then((res) => (res ? parseDBUser(res) : undefined));
+		.then((res) => res ?? undefined);
 
 	if (!userResult) {
 		throw new RequestError({
@@ -2359,22 +2431,16 @@ async function fetchUserList(
 ): Promise<Array<OTFUsersParsedType>> {
 	const userTable = OTFusersTable(clientID);
 	if (filters.limit) {
-		return (
-			await drizzle(database)
-				.select()
-				.from(userTable)
-				.limit(Number(filters.limit))
-				.offset(
-					filters.limit
-						? (Number(filters.page) - 1) * Number(filters.limit)
-						: 0,
-				)
-				.all()
-		).map(parseDBUser) as OTFUsersParsedType[];
+		return await drizzle(database)
+			.select()
+			.from(userTable)
+			.limit(Number(filters.limit))
+			.offset(
+				filters.limit ? (Number(filters.page) - 1) * Number(filters.limit) : 0,
+			)
+			.all();
 	} else {
-		return (
-			await drizzle(database).select().from(OTFusersTable(clientID)).all()
-		).map(parseDBUser) as OTFUsersParsedType[];
+		return await drizzle(database).select().from(OTFusersTable(clientID)).all();
 	}
 }
 
@@ -2447,6 +2513,7 @@ async function getUserPrivateData({
 			id: usersTable.id,
 			identifier: usersTable.identifier,
 			data: usersTable.data,
+			role: usersTable.role,
 		})
 		.from(usersTable)
 		.where(eq(usersTable.id, userID))
@@ -2461,14 +2528,14 @@ async function getUserPrivateData({
 			}
 			return {
 				data: {
-					private: el.private ? JSON.parse(el.private) : null,
-					public: el.public ? JSON.parse(el.public) : null,
+					private: el.private ?? null,
+					public: el.public ?? null,
 					user_id: el.id,
 					user_identifier: el.identifier,
-					userInfo: el.data ? JSON.parse(el.data as string) : null,
+					userInfo: { ...el.data, role: el.role },
 				},
 				success: true,
-			};
+			} satisfies ResponseData;
 		});
 }
 
@@ -2484,6 +2551,7 @@ function getUserPublicData(
 			id: usersTable.id,
 			identifier: usersTable.identifier,
 			data: usersTable.data,
+			role: usersTable.role,
 		})
 		.from(usersTable)
 		.where(eq(usersTable.id, userID))
@@ -2499,20 +2567,20 @@ function getUserPublicData(
 			return {
 				success: true,
 				data: {
-					public: el.public ? JSON.parse(el.public) : null,
+					public: el.public ?? null,
 					private: null,
 					user_id: el.id,
 					user_identifier: el.identifier,
-					userInfo: el.data ? JSON.parse(el.data as string) : null,
+					userInfo: { ...el.data, role: el.role },
 				},
-			};
+			} satisfies ResponseData;
 		})
 		.catch((err) => {
 			log("Error fetching public data:", err);
 			return {
 				success: false,
 				error: `Internal server error: ${err.message}`,
-			};
+			} satisfies ResponseData;
 		});
 }
 
@@ -2546,34 +2614,35 @@ async function updateUserPublicData({
 	return drizzle(env.AUTH_DB)
 		.update(usersTable)
 		.set({
-			session_public: JSON.stringify(mergedData),
+			session_public: mergedData,
 		})
 		.where(eq(usersTable.id, userID))
 		.limit(1)
 		.returning({
 			session_public: usersTable.session_public,
 			data: usersTable.data,
+			id: usersTable.id,
+			identifier: usersTable.identifier,
+			role: usersTable.role,
 		})
-		.then((el) => {
-			if (el.length === 0) {
+		.then(([el]) => {
+			if (!el) {
 				return {
 					success: false,
 					error: "User not found",
 				};
 			}
 
-			const _el = el.at(0);
-
 			return {
 				success: true,
 				data: {
-					public: _el?.session_public ? JSON.parse(_el.session_public) : null,
+					public: el.session_public ?? null,
 					private: null,
 					user_id: userID,
-					user_identifier: currentData.data?.user_identifier || "",
-					userInfo: _el?.data ? JSON.parse(_el.data as string) : null,
+					user_identifier: el.identifier,
+					userInfo: { ...el.data, role: el.role },
 				},
-			};
+			} satisfies ResponseData;
 		});
 }
 
@@ -2608,7 +2677,7 @@ async function updateUserPrivateData({
 	return drizzle(env.AUTH_DB)
 		.update(usersTable)
 		.set({
-			session_private: JSON.stringify(mergedData),
+			session_private: mergedData,
 		})
 		.where(eq(usersTable.id, userID))
 		.limit(1)
@@ -2618,28 +2687,25 @@ async function updateUserPrivateData({
 			id: usersTable.id,
 			identifier: usersTable.identifier,
 			data: usersTable.data,
+			role: usersTable.role,
 		})
-		.then((el) => {
-			if (el.length === 0) {
+		.then(([el]) => {
+			if (!el) {
 				return {
 					success: false,
 					error: "User not found",
 				};
 			}
 
-			const _el = el.at(0);
-
 			return {
 				success: true,
 				data: {
-					private: _el?.session_private
-						? JSON.parse(_el.session_private)
-						: null,
-					public: _el?.session_public ? JSON.parse(_el.session_public) : null,
+					private: el.session_private,
+					public: el.session_public,
 					user_id: userID,
-					user_identifier: _el?.identifier ?? "",
-					userInfo: _el?.data ? JSON.parse(_el.data as string) : null,
+					user_identifier: el.identifier,
+					userInfo: { ...el.data, role: el.role },
 				},
-			};
+			} satisfies ResponseData;
 		});
 }

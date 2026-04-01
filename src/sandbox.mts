@@ -13,8 +13,13 @@ export class SandBox {
 	}
 
 	private async init() {
-		const { getQuickJSWASMModule } = await import("@cf-wasm/quickjs/workerd");
-		this._qjs = await getQuickJSWASMModule();
+		if (process.env.NODE_ENV === "test") {
+			const nodeQJS = await import("@cf-wasm/quickjs/node");
+			this._qjs = await nodeQJS.getQuickJSWASMModule();
+		} else {
+			const { getQuickJSWASMModule } = await import("@cf-wasm/quickjs/workerd");
+			this._qjs = await getQuickJSWASMModule();
+		}
 		return this;
 	}
 

@@ -12,48 +12,63 @@ declare global {
 globalThis.isLog ??= false;
 
 async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
-	//@ts-expect-error
 	if (env.LOG_ENABLED === "true") globalThis.isLog = true;
-	try {
-		return await endpoints.fetch(request, env, ctx);
-	} catch (error) {
-		if (error instanceof PartialRequestError) {
-			log(`PartialRequestError: ${error.message}, status: ${error.status}`);
-			return new Response(error.message, { status: error.status });
-		}
-
+	endpoints.onError(async (error, c) => {
 		if (error instanceof RequestError) {
-			await insertLog({
-				clientID: error.params?.clientID || "unknown",
-				type: "error",
-				message: error.message,
-				database: env.AUTH_DB,
-				endpoint: error.endpoint || "unknown",
-				context: {
-					params: error.params || null,
-					stack: error.stack,
-					request: { headers: Object.fromEntries(request.headers.entries()) },
-					response: { status: error.status },
-					token: error.token || null,
-					secret: error.secret || null,
-				},
-			});
-
-			if (error.response) {
-				return new Response((error.response.body as string) ?? "Error", {
-					...error.response.init,
-					status: error.status,
+			const clientID = c.get("project")?.clientID;
+			if (clientID)
+				await insertLog({
+					clientID: clientID,
+					type: "error",
+					message: error.message,
+					database: env.AUTH_DB,
+					endpoint: error.endpoint,
+					context: {
+						params: error.params || null,
+						stack: error.stack,
+						request: { headers: Object.fromEntries(request.headers.entries()) },
+						response: { status: error.status },
+						token: error.token || null,
+						secret: error.secret || null,
+					},
 				});
-			}
+			return c.text(error.message, { status: error.status });
+		} else if (error instanceof PartialRequestError) {
+			const clientID = c.get("project")?.clientID;
+			if (clientID)
+				await insertLog({
+					clientID: clientID,
+					type: "error",
+					message: error.message,
+					database: env.AUTH_DB,
+					endpoint: new URL(c.req.url).pathname,
+					context: {
+						params: c.get("params") || null,
+						stack: error.stack,
+						request: { headers: Object.fromEntries(request.headers.entries()) },
+						response: { status: error.status },
+					},
+				});
+			return c.text(error.message, { status: error.status });
+		} else {
+			log(`Unexpected error in endpoint handler: ${(error as Error).message}`, {
+				stack: (error as Error).stack,
+			});
+			const clientID = c.get("project")?.clientID;
+			if (clientID)
+				await insertLog({
+					clientID: clientID,
+					type: "error",
+					message: (error as Error).message,
+					database: env.AUTH_DB,
+					endpoint: new URL(c.req.url).pathname,
+				});
 
-			return new Response(error.message, { status: error.status });
+			return c.text("Internal Server Error", { status: 500 });
 		}
+	});
 
-		log(`Unexpected error in fetch handler: ${(error as Error).message}`, {
-			stack: (error as Error).stack,
-		});
-		return new Response("Internal Server Error", { status: 500 });
-	}
+	return await endpoints.fetch(request, env, ctx);
 }
 
 export default {
