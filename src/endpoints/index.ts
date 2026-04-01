@@ -2356,28 +2356,28 @@ async function getOrCreateUser({
 	if (!exists) await inviteHelper.handleRegister(params.inviteID);
 
 	const dataToStore = {
-		...(userData.data ?? exists?.data ?? {}),
+		...(userData.data ?? {}),
+		...(exists?.data ?? {}),
 		provider: exists?.data?.provider || value.provider,
 	};
-	const userResult =
-		exists ??
-		(await drizzle(env.AUTH_DB)
-			.insert(usersTable)
-			.values({
-				id: crypto.randomUUID(),
-				identifier: userData.identifier,
+	const userResult = await drizzle(env.AUTH_DB)
+		.insert(usersTable)
+		.values({
+			id: crypto.randomUUID(),
+			identifier: exists?.identifier ?? userData.identifier,
+			data: dataToStore,
+			created_at: new Date().toISOString(),
+			email: userData.data?.email ?? null,
+		})
+		.onConflictDoUpdate({
+			target: usersTable.identifier,
+			set: {
 				data: dataToStore,
-				created_at: new Date().toISOString(),
-			})
-			.onConflictDoUpdate({
-				target: usersTable.identifier,
-				set: {
-					data: dataToStore,
-				},
-			})
-			.returning()
-			.then((r) => r.at(0))
-			.then((res) => res ?? undefined));
+			},
+		})
+		.returning()
+		.then((r) => r.at(0))
+		.then((res) => res ?? undefined);
 
 	if (!userResult) {
 		throw new RequestError({
