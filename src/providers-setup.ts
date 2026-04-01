@@ -748,10 +748,7 @@ const discordBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/discord").then((mod) =>
-			mod.DiscordProvider({
-				scopes: ["identify", "email"],
-				...providerConfig.data,
-			}),
+			mod.DiscordProvider(providerConfig.data),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<DiscordUserInfo>(
@@ -790,10 +787,7 @@ const facebookBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/facebook").then((mod) =>
-			mod.FacebookProvider({
-				scopes: ["email", "public_profile"],
-				...providerConfig.data,
-			}),
+			mod.FacebookProvider(providerConfig.data),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<FacebookUserInfo>(
@@ -830,10 +824,7 @@ const githubBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/github").then((mod) =>
-			mod.GithubProvider({
-				scopes: ["user:email", "read:user"],
-				...providerConfig.data,
-			}),
+			mod.GithubProvider(providerConfig.data),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<GitHubUserInfo>(
@@ -915,10 +906,7 @@ const jumpcloudBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/jumpcloud").then((mod) =>
-			mod.JumpCloudProvider({
-				scopes: ["openid", "email", "profile"],
-				...providerConfig.data,
-			}),
+			mod.JumpCloudProvider(providerConfig.data),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<JumpCloudUserInfo>(
@@ -1090,10 +1078,7 @@ const spotifyBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/spotify").then((mod) =>
-			mod.SpotifyProvider({
-				scopes: ["user-read-email", "user-read-private"],
-				...providerConfig.data,
-			}),
+			mod.SpotifyProvider(providerConfig.data),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<SpotifyUserInfo>(
@@ -1132,10 +1117,7 @@ const twitchBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/twitch").then((mod) =>
-			mod.TwitchProvider({
-				scopes: ["user:read:email"],
-				...providerConfig.data,
-			}),
+			mod.TwitchProvider(providerConfig.data),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<TwitchUserInfo>(
@@ -1173,10 +1155,7 @@ const yahooBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/yahoo").then((mod) =>
-			mod.YahooProvider({
-				scopes: ["openid", "email", "profile"],
-				...providerConfig.data,
-			}),
+			mod.YahooProvider(providerConfig.data),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<YahooUserInfo>(
