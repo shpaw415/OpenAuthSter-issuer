@@ -66,7 +66,7 @@ import globalOpenAutsterConfig, { subjects } from "../../openauth.config";
 import packageJson from "../../package.json" with { type: "json" };
 // Internal imports
 import Issuer from "../";
-import { getAllCache, getCache, setCache } from "../cache";
+import { deleteCache, getAllCache, getCache, setCache } from "../cache";
 import DefaultTheme from "../defaults/theme";
 import {
 	generateProvidersFromConfig,
@@ -152,14 +152,6 @@ endpoints
 			"Access-Control-Allow-Methods": "GET",
 		});
 	});
-
-/**
- * ClearCache endpoint for clearing the project cache
- * **Will be used in the v0.3.0 of the webUI**
- */
-endpoints.get("/clear-cache/:key", (c) => {
-	return c.json({ status: "not_implemented" }, 501);
-});
 
 // middleware ////////////////////////////////////////////////////////////
 
@@ -254,6 +246,20 @@ endpoints
 	.options("*", (c) => {
 		return c.text("ok");
 	}); // Handle preflight requests
+
+/**
+ * ClearCache endpoint for clearing the project cache
+ * **Will be used in the v0.3.0 of the webUI**
+ */
+endpoints.get("/clear-cache/:project_id", async (c) => {
+	const res = await getSecretFromRequest(c.req.raw, c.get("project"));
+	if (res.error) {
+		return c.json({ error: `Unauthorized: ${res.error}`, success: false }, 401);
+	}
+
+	deleteCache(c.req.param("project_id"));
+	return c.json({ success: true });
+});
 
 // Protected endpoints with MFA requirement ////////////////////////////////////////////////////////////
 
