@@ -26,7 +26,13 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
 					context: {
 						params: error.params || null,
 						stack: error.stack,
-						request: { headers: Object.fromEntries(request.headers.entries()) },
+						request: {
+							headers: Object.fromEntries(
+								Array.from(request.headers.entries()).filter(
+									([key]) => key.toLowerCase() !== "authorization",
+								),
+							),
+						},
 						response: { status: error.status },
 						token: error.token || null,
 						secret: error.secret || null,
@@ -45,7 +51,13 @@ async function _fetch(request: Request, env: Env, ctx: ExecutionContext) {
 					context: {
 						params: c.get("params") || null,
 						stack: error.stack,
-						request: { headers: Object.fromEntries(request.headers.entries()) },
+						request: {
+							headers: Object.fromEntries(
+								Array.from(request.headers.entries()).filter(
+									([key]) => key.toLowerCase() !== "authorization",
+								),
+							),
+						},
 						response: { status: error.status },
 					},
 				});
