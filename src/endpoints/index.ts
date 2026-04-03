@@ -2127,17 +2127,17 @@ endpoints.all("*", async (c) => {
 
 			const logger = insertLog({
 				type: "info",
-				message: `User ${userData.parser.id} ${userData.type} successfully with provider ${value.provider}`,
+				message: `User ${userData.parser.data?.id} ${userData.type} successfully with provider ${value.provider}`,
 				clientID: project.clientID,
 				context: {
 					provider: value.provider,
-					userID: userData.parser.id,
+					userID: userData.parser.data?.id,
 				},
 				database: c.env.AUTH_DB,
 			});
 
 			const res = ctx.subject("user", {
-				id: userData.parser.id,
+				id: userData.parser.data?.id,
 				data: userData.dbUser?.data ?? {},
 				identifier: userData.dbUser?.identifier ?? "",
 				clientID: params.clientID as string,
@@ -2152,7 +2152,7 @@ endpoints.all("*", async (c) => {
 		refresh: async (ctx, value) => {
 			const userTable = OTFusersTable(project.clientID);
 			const user = await drizzle(c.env.AUTH_DB)
-				.select({ role: userTable.role })
+				.select({ role: userTable.role, data: userTable.data })
 				.from(userTable)
 				.where(eq(userTable.id, value.properties.id))
 				.get();
@@ -2171,6 +2171,7 @@ endpoints.all("*", async (c) => {
 			return ctx.subject("user", {
 				...value.properties,
 				role: user.role,
+				data: user.data,
 			});
 		},
 		async error(error, req) {
@@ -2326,6 +2327,55 @@ async function userExists({
 		.then((res) => res ?? undefined);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function deepMergeRecords(
+	base: Record<string, unknown> | null | undefined,
+	override: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+	const result: Record<string, unknown> = isPlainObject(base)
+		? { ...base }
+		: {};
+
+	if (!isPlainObject(override)) return result;
+
+	for (const [key, overrideValue] of Object.entries(override)) {
+		if (overrideValue === undefined) continue;
+
+		const baseValue = result[key];
+		result[key] =
+			isPlainObject(baseValue) && isPlainObject(overrideValue)
+				? deepMergeRecords(baseValue, overrideValue)
+				: overrideValue;
+	}
+
+	return result;
+}
+
+function getStringProperty(
+	record: Record<string, unknown> | null | undefined,
+	key: string,
+): string | undefined {
+	const value = record?.[key];
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getProviderDisplayName(
+	providerData: Record<string, unknown> | null | undefined,
+): string | undefined {
+	return (
+		getStringProperty(providerData, "name") ||
+		getStringProperty(providerData, "displayName") ||
+		getStringProperty(providerData, "username") ||
+		getStringProperty(providerData, "login") ||
+		getStringProperty(providerData, "preferred_username") ||
+		getStringProperty(providerData, "given_name") ||
+		getStringProperty(providerData, "givenName")
+	);
+}
+
 async function getOrCreateUser({
 	env,
 	value,
@@ -2341,14 +2391,43 @@ async function getOrCreateUser({
 	params: Params;
 	ctx: EndpointCtx;
 }): Promise<{
-	parser: userExtractResult<Record<string, unknown>> & { id: string };
+	parser: userExtractResult<
+		{ email?: string; id: string } & Record<string, unknown>
+	>;
 	dbUser: Partial<OTFUsersParsedType>;
 	type: "login" | "register";
 }> {
 	const usersTable = OTFusersTable(project.clientID);
-	const userData = await providerConfigMap[
-		value.provider as keyof typeof providerConfigMap
-	].parser(value, providerConfig, env, ctx);
+	let userData: userExtractResult<{ email?: string }>;
+	try {
+		userData = await providerConfigMap[
+			value.provider as keyof typeof providerConfigMap
+		].parser(value, providerConfig, env, ctx);
+	} catch (err) {
+		return await insertLog({
+			type: "error",
+			message: `Error parsing user data from provider ${value.provider}: ${
+				err instanceof Error ? err.message : String(err)
+			}`,
+			clientID: project.clientID,
+			context: {
+				provider: value.provider,
+				error: err instanceof Error ? err.message : String(err),
+			},
+			database: env.AUTH_DB,
+			endpoint: "getOrCreateUser",
+		}).then(() => {
+			throw new RequestError({
+				message: `Error parsing user data from provider ${value.provider}: ${
+					err instanceof Error ? err.message : String(err)
+				}`,
+				status: 500,
+				project,
+				params,
+				request: ctx.req.raw,
+			});
+		});
+	}
 
 	const exists = await userExists({
 		env,
@@ -2361,11 +2440,28 @@ async function getOrCreateUser({
 
 	if (!exists) await inviteHelper.handleRegister(params.inviteID);
 
+	const existingStoredData = isPlainObject(exists?.data)
+		? exists.data
+		: undefined;
+	const mergedProviderData = deepMergeRecords(
+		isPlainObject(existingStoredData?.[value.provider])
+			? (existingStoredData[value.provider] as Record<string, unknown>)
+			: undefined,
+		userData.data,
+	);
 	const dataToStore = {
-		...(userData.data ?? {}),
-		...(exists?.data ?? {}),
-		provider: exists?.data?.provider || value.provider,
-	};
+		...(existingStoredData ?? {}),
+		[value.provider]: mergedProviderData,
+		email:
+			userData.data?.email ??
+			exists?.email ??
+			getStringProperty(existingStoredData, "email"),
+		name:
+			getProviderDisplayName(mergedProviderData) ??
+			getStringProperty(existingStoredData, "name"),
+		provider: value.provider,
+	} as Record<string, unknown> & { provider: ProviderType };
+
 	const userResult = await drizzle(env.AUTH_DB)
 		.insert(usersTable)
 		.values({
@@ -2444,14 +2540,19 @@ async function getOrCreateUser({
 		});
 
 	return {
-		parser: { ...userData, id: userResult.id as string },
+		parser: {
+			identifier: userData.identifier,
+			data: {
+				...userData.data,
+				id: userResult.id,
+			},
+		},
 		dbUser: userResult,
 		type: exists ? "login" : "register",
 	};
 }
 
-// Helper functions ////////////////////////////////////////////////////////
-
+/** Helper functions ///////////////////////// */
 async function fetchUserList(
 	clientID: string,
 	filters: GetUserListFilters,
@@ -2622,7 +2723,7 @@ async function updateUserPublicData({
 	userID: string;
 	clientID: string;
 	env: Env;
-	newData: Record<string, never> | null;
+	newData: Record<string, unknown> | null;
 	skipMerge?: boolean;
 }): Promise<ResponseData> {
 	const usersTable = OTFusersTable(clientID);
@@ -2633,12 +2734,14 @@ async function updateUserPublicData({
 			error: "User not found",
 		};
 	}
-	const mergedData: Record<string, never> | null = skipMerge
+	const mergedData: Record<string, unknown> | null = skipMerge
 		? newData
-		: {
-				...(currentData.data?.public || {}),
-				...(newData || {}),
-			};
+		: deepMergeRecords(
+				isPlainObject(currentData.data?.public)
+					? currentData.data.public
+					: undefined,
+				newData,
+			);
 	return drizzle(env.AUTH_DB)
 		.update(usersTable)
 		.set({
@@ -2684,7 +2787,7 @@ async function updateUserPrivateData({
 	userID: string;
 	clientID: string;
 	env: Env;
-	newData: Record<string, never> | null;
+	newData: Record<string, unknown> | null;
 	skipMerge?: boolean;
 }): Promise<ResponseData> {
 	const usersTable = OTFusersTable(clientID);
@@ -2696,12 +2799,14 @@ async function updateUserPrivateData({
 	if (!currentData.success) {
 		return currentData;
 	}
-	const mergedData = skipMerge
+	const mergedData: Record<string, unknown> | null = skipMerge
 		? newData
-		: {
-				...(currentData.data?.private || {}),
-				...newData,
-			};
+		: deepMergeRecords(
+				isPlainObject(currentData.data?.private)
+					? currentData.data.private
+					: undefined,
+				newData,
+			);
 	return drizzle(env.AUTH_DB)
 		.update(usersTable)
 		.set({

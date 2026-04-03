@@ -46,7 +46,7 @@ function ensureCssInline() {
 
 export type userExtractResult<T extends Record<string, unknown>> = {
 	identifier: string;
-	data?: T;
+	data: T;
 };
 export type userExtractFunction<
 	Input,
@@ -394,6 +394,50 @@ function OAuth2Fetcher<UserInfo>(
 		.then((res) => res.json() as Promise<UserInfo>);
 }
 
+function hasScope(
+	scopes: string[] | undefined,
+	matcher: (scope: string) => boolean,
+) {
+	return scopes?.some((scope) => matcher(scope.toLowerCase())) ?? false;
+}
+
+function getMicrosoftUserInfoUrl(scopes: string[] | undefined) {
+	const hasGraphUserScope = hasScope(
+		scopes,
+		(scope) => scope === "user.read" || scope.endsWith("/user.read"),
+	);
+
+	if (hasGraphUserScope) return "https://graph.microsoft.com/v1.0/me";
+
+	return "https://graph.microsoft.com/oidc/userinfo";
+}
+
+function getCognitoUserInfoUrl(domain: string, region: string) {
+	const normalizedDomain = domain
+		.replace(/^https?:\/\//, "")
+		.replace(/\/+$/, "");
+	const host = normalizedDomain.includes(".amazoncognito.com")
+		? normalizedDomain
+		: `${normalizedDomain}.auth.${region}.amazoncognito.com`;
+
+	return `https://${host}/oauth2/userInfo`;
+}
+
+function ensureRequiredScopes(
+	scopes: string[] | undefined,
+	requiredScopes: string[],
+) {
+	const normalizedScopes = scopes ?? [];
+	const existing = new Set(
+		normalizedScopes.map((scope) => scope.toLowerCase()),
+	);
+
+	return [
+		...normalizedScopes,
+		...requiredScopes.filter((scope) => !existing.has(scope.toLowerCase())),
+	];
+}
+
 // Password Provider ///////////////////////
 
 const passwordConfigBuilder: ConfigType<
@@ -645,13 +689,15 @@ const xBuilder: ConfigType<
 		import("@kagii/openauth/provider/x").then((mod) =>
 			mod.XProvider({
 				...providerConfig.data,
-				scopes: ["users.read", "tweet.read"],
 			}),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<XUserInfo>(
-			"https://api.twitter.com/2/users/me?user.fields=id,name,username,profile_image_url",
+			"https://api.x.com/2/users/me?user.fields=id,name,username,profile_image_url",
 			data.tokenset.access,
+			{
+				Accept: "application/json",
+			},
 		);
 		return {
 			identifier: info.data.id,
@@ -718,9 +764,10 @@ const cognitoBuilder: ConfigType<
 	parser: async (data, providerConfig) => {
 		const { domain, region } = providerConfig.data;
 		const info = await OAuth2Fetcher<CognitoUserInfo>(
-			`https://${domain}.auth.${region}.amazoncognito.com/oauth2/userInfo`,
+			getCognitoUserInfoUrl(domain, region),
 			data.tokenset.access,
 		);
+		console.log("Cognito user info:", info);
 		return {
 			identifier: info.sub || (info.email as string),
 			data: info,
@@ -748,11 +795,14 @@ const discordBuilder: ConfigType<
 > = {
 	provider: ({ providerConfig }) =>
 		import("@kagii/openauth/provider/discord").then((mod) =>
-			mod.DiscordProvider(providerConfig.data),
+			mod.DiscordProvider({
+				...providerConfig.data,
+				scopes: ensureRequiredScopes(providerConfig.data.scopes, ["identify"]),
+			}),
 		),
 	parser: async (data) => {
 		const info = await OAuth2Fetcher<DiscordUserInfo>(
-			"https://discord.com/api/users/@me",
+			"https://discord.com/api/v10/users/@me",
 			data.tokenset.access,
 			{
 				Accept: "application/json",
@@ -962,12 +1012,18 @@ const keycloakBuilder: ConfigType<
 // Microsoft Provider /////////////////////////////
 
 export type MicrosoftUserInfo = {
-	id: string;
+	id?: string;
+	sub?: string;
+	name?: string;
 	displayName?: string;
+	email?: string;
 	givenName?: string;
+	given_name?: string;
 	surname?: string;
+	family_name?: string;
 	mail?: string;
-	userPrincipalName: string;
+	preferred_username?: string;
+	userPrincipalName?: string;
 	jobTitle?: string;
 };
 
@@ -980,16 +1036,30 @@ const microsoftBuilder: ConfigType<
 		import("@kagii/openauth/provider/microsoft").then((mod) =>
 			mod.MicrosoftProvider(providerConfig.data),
 		),
-	parser: async (data) => {
+	parser: async (data, providerConfig) => {
 		const info = await OAuth2Fetcher<MicrosoftUserInfo>(
-			"https://graph.microsoft.com/v1.0/me",
+			getMicrosoftUserInfoUrl(providerConfig.data.scopes),
 			data.tokenset.access,
 			{
 				Accept: "application/json",
 			},
 		);
+		const identifier =
+			info.id ||
+			info.sub ||
+			info.userPrincipalName ||
+			info.preferred_username ||
+			info.mail ||
+			info.email;
+
+		if (!identifier) {
+			throw new Error(
+				"Microsoft provider did not return a usable identifier from the configured scopes.",
+			);
+		}
+
 		return {
-			identifier: info.id,
+			identifier,
 			data: info,
 		};
 	},
@@ -1248,7 +1318,7 @@ const passkeyBuilder: ConfigType<
 	parser: async (data) => {
 		return {
 			identifier: data.identifier,
-			data: undefined,
+			data: {},
 		};
 	},
 };
