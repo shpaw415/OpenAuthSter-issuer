@@ -24,6 +24,21 @@ import type {
 	SlackProviderConfig,
 } from "openauth-webui-shared-types";
 import { parseDBCopyTemplate } from "openauth-webui-shared-types";
+import type {
+	CognitoUserInfo,
+	DiscordUserInfo,
+	FacebookUserInfo,
+	GitHubUserInfo,
+	GoogleUserInfo,
+	JumpCloudUserInfo,
+	KeycloakUserInfo,
+	MicrosoftUserInfo,
+	SlackUserInfo,
+	SpotifyUserInfo,
+	TwitchUserInfo,
+	XUserInfo,
+	YahooUserInfo,
+} from "openauth-webui-shared-types/client/user";
 import {
 	emailTemplatesTable,
 	WebUiCopyTemplateTable,
@@ -671,15 +686,6 @@ const appleBuilder: ConfigType<
 
 // X Provider /////////////////////////////
 
-export type XUserInfo = {
-	data: {
-		id: string;
-		name: string;
-		username: string;
-		profile_image_url?: string;
-	};
-};
-
 const xBuilder: ConfigType<
 	OAuth2ProviderConfig,
 	TokenSetKey,
@@ -708,18 +714,6 @@ const xBuilder: ConfigType<
 
 // slack Provider /////////////////////////////
 
-export type SlackUserInfo = {
-	sub: string;
-	email?: string;
-	email_verified?: boolean;
-	name?: string;
-	picture?: string;
-	given_name?: string;
-	family_name?: string;
-	locale?: string;
-	[key: string]: unknown;
-};
-
 const slackBuilder: ConfigType<
 	SlackProviderConfig,
 	{ tokenset: TokenSet; clientID: string },
@@ -742,15 +736,6 @@ const slackBuilder: ConfigType<
 };
 
 // Cognito Provider /////////////////////////////
-
-export type CognitoUserInfo = {
-	sub: string;
-	email?: string;
-	email_verified?: string;
-	username?: string;
-	name?: string;
-	[key: string]: unknown;
-};
 
 const cognitoBuilder: ConfigType<
 	CognitoProviderConfig,
@@ -776,17 +761,6 @@ const cognitoBuilder: ConfigType<
 };
 
 // discord Provider /////////////////////////////
-
-export type DiscordUserInfo = {
-	id: string;
-	username: string;
-	discriminator: string;
-	global_name?: string;
-	avatar?: string;
-	email?: string;
-	verified?: boolean;
-	locale?: string;
-};
 
 const discordBuilder: ConfigType<
 	OAuth2ProviderConfig,
@@ -817,19 +791,6 @@ const discordBuilder: ConfigType<
 
 // facebook Provider /////////////////////////////
 
-export type FacebookUserInfo = {
-	id: string;
-	name?: string;
-	email?: string;
-	picture?: {
-		data: {
-			url: string;
-			width: number;
-			height: number;
-		};
-	};
-};
-
 const facebookBuilder: ConfigType<
 	OAuth2ProviderConfig,
 	TokenSetKey,
@@ -855,17 +816,6 @@ const facebookBuilder: ConfigType<
 };
 
 // github Provider /////////////////////////////
-
-export type GitHubUserInfo = {
-	id: number;
-	login: string;
-	name?: string;
-	email?: string;
-	avatar_url?: string;
-	bio?: string;
-	company?: string;
-	location?: string;
-};
 
 const githubBuilder: ConfigType<
 	OAuth2ProviderConfig,
@@ -900,16 +850,6 @@ export type GoogleData = {
 	tokenset: TokenSet;
 };
 
-export type GoogleUserInfo = {
-	email?: string;
-	email_verified?: boolean;
-	sub: string;
-	name?: string;
-	picture?: string;
-	given_name?: string;
-	family_name?: string;
-};
-
 const googleBuilder: ConfigType<
 	GoogleProviderConfig,
 	GoogleData,
@@ -940,15 +880,6 @@ const googleBuilder: ConfigType<
 
 // JumpCloud Provider /////////////////////////////
 
-export type JumpCloudUserInfo = {
-	sub: string;
-	email?: string;
-	email_verified?: boolean;
-	name?: string;
-	given_name?: string;
-	family_name?: string;
-};
-
 const jumpcloudBuilder: ConfigType<
 	OAuth2ProviderConfig,
 	TokenSetKey,
@@ -973,17 +904,6 @@ const jumpcloudBuilder: ConfigType<
 /////////////////////////////////////////////
 
 // Keycloak Provider /////////////////////////////
-
-export type KeycloakUserInfo = {
-	sub: string;
-	email?: string;
-	email_verified?: boolean;
-	preferred_username?: string;
-	name?: string;
-	given_name?: string;
-	family_name?: string;
-	[key: string]: unknown;
-};
 
 const keycloakBuilder: ConfigType<
 	KeycloakProviderConfig,
@@ -1010,22 +930,6 @@ const keycloakBuilder: ConfigType<
 /////////////////////////////////////////////
 
 // Microsoft Provider /////////////////////////////
-
-export type MicrosoftUserInfo = {
-	id?: string;
-	sub?: string;
-	name?: string;
-	displayName?: string;
-	email?: string;
-	givenName?: string;
-	given_name?: string;
-	surname?: string;
-	family_name?: string;
-	mail?: string;
-	preferred_username?: string;
-	userPrincipalName?: string;
-	jobTitle?: string;
-};
 
 const microsoftBuilder: ConfigType<
 	MicrosoftProviderConfig,
@@ -1132,15 +1036,6 @@ const oauth2Builder: ConfigType<
 
 // Spotify Provider /////////////////////////////
 
-export type SpotifyUserInfo = {
-	id: string;
-	display_name?: string;
-	email?: string;
-	images?: Array<{ url: string; width: number; height: number }>;
-	country?: string;
-	product?: string;
-};
-
 const spotifyBuilder: ConfigType<
 	OAuth2ProviderConfig,
 	TokenSetKey,
@@ -1168,17 +1063,6 @@ const spotifyBuilder: ConfigType<
 ////////////////////////////////////////////
 
 // Twitch Provider /////////////////////////////
-
-export type TwitchUserInfo = {
-	data: Array<{
-		id: string;
-		login: string;
-		display_name: string;
-		email?: string;
-		profile_image_url?: string;
-		broadcaster_type?: string;
-	}>;
-};
 
 const twitchBuilder: ConfigType<
 	OAuth2ProviderConfig,
@@ -1209,14 +1093,6 @@ const twitchBuilder: ConfigType<
 ////////////////////////////////////////////
 
 // Yahoo Provider /////////////////////////////
-
-export type YahooUserInfo = {
-	sub: string;
-	name?: string;
-	email?: string;
-	email_verified?: boolean;
-	picture?: string;
-};
 
 const yahooBuilder: ConfigType<
 	OAuth2ProviderConfig,

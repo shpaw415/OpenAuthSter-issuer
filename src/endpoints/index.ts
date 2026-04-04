@@ -52,9 +52,9 @@ import {
 import type { OTFUsersParsedType } from "openauth-webui-shared-types/database/types";
 import { and, drizzle, eq, or } from "openauth-webui-shared-types/drizzle";
 import {
+	type UserResponseSchemaType as _UserResponseSchemaType,
 	type GetUserListFilters,
 	UserListSchemaValidation,
-	type UserResponseSchemaType as _UserResponseSchemaType,
 } from "openauth-webui-shared-types/endpoints";
 import { createSelfClient } from "openauth-webui-shared-types/providers/utils";
 import { deleteUserWithAuthState } from "openauth-webui-shared-types/user/delete";
