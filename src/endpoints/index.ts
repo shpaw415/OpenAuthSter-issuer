@@ -457,14 +457,22 @@ endpoints
 			const newData = (await c.req.json()) as Partial<
 				ReturnType<typeof OTFusersTable>["$inferSelect"]
 			>;
-			const allowedFields = [
+			const allowedFields: Array<
+				keyof ReturnType<typeof OTFusersTable>["$inferSelect"]
+			> = [
 				"identifier",
 				"data",
 				"session_public",
 				"session_private",
+				"role",
+				"email",
 			];
 			const filteredData = Object.fromEntries(
-				Object.entries(newData).filter(([key]) => allowedFields.includes(key)),
+				Object.entries(newData).filter(([key]) =>
+					allowedFields.includes(
+						key as keyof ReturnType<typeof OTFusersTable>["$inferSelect"],
+					),
+				),
 			) as Partial<ReturnType<typeof OTFusersTable>["$inferSelect"]>;
 			const userTable = OTFusersTable(clientID);
 
