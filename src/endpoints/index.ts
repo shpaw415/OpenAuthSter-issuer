@@ -1781,6 +1781,24 @@ endpoints
 		}
 
 		return c.json(totpResponse({ success: true, data: null }), 200);
+	})
+	.get("/totp/status", async (c) => {
+		const userInfo = c.get("userInfo");
+		const project = c.get("project");
+		const totp_user = await getUserMFATOTP({
+			db: drizzle(c.env.AUTH_DB),
+			userID: userInfo.id,
+			clientID: project.clientID,
+		});
+		return c.json(
+			totpResponse({
+				success: true,
+				data: {
+					totp_enabled: totp_user?.verified ?? false,
+				},
+			}),
+			200,
+		);
 	});
 
 // passkey endpoints ///////////////////////////////////////////////////////////
@@ -2150,23 +2168,11 @@ endpoints.all("*", async (c) => {
 				database: c.env.AUTH_DB,
 			});
 
-			const user_totp_enabled =
-				userData.type === "register"
-					? false
-					: ((await getUserMFATOTP({
-							db: drizzle(c.env.AUTH_DB),
-							userID: userData.parser.data?.id as string,
-							clientID: project.clientID,
-						}).then((c) => c?.verified)) ?? false);
-
 			const res = ctx.subject("user", {
 				id: userData.parser.data?.id,
 				data: userData.dbUser?.data ?? {},
 				identifier: userData.dbUser?.identifier ?? "",
 				clientID: params.clientID as string,
-				mfa: {
-					totp_enabled: user_totp_enabled,
-				},
 				provider:
 					(userData.dbUser?.data?.provider as string) ??
 					(value.provider as Omit<ProviderType, "qr"> as string),
@@ -2202,14 +2208,6 @@ endpoints.all("*", async (c) => {
 				...value.properties,
 				role: user.role,
 				data: user.data,
-				mfa: {
-					totp_enabled:
-						(await getUserMFATOTP({
-							db: drizzle(c.env.AUTH_DB),
-							userID: user.id,
-							clientID: project.clientID,
-						}).then((c) => c?.verified)) ?? false,
-				},
 			});
 		},
 		async error(error, req) {
@@ -2688,13 +2686,6 @@ async function getUserPrivateData({
 	env: Env;
 }): Promise<ResponseData> {
 	const db = drizzle(env.AUTH_DB);
-
-	const user_totp = await getUserMFATOTP({
-		db,
-		userID,
-		clientID,
-	});
-
 	const usersTable = OTFusersTable(clientID);
 	return db
 		.select({
@@ -2725,9 +2716,6 @@ async function getUserPrivateData({
 					userInfo: {
 						...el.data,
 						role: el.role,
-						mfa: {
-							totp_enabled: user_totp?.verified ?? false,
-						},
 					},
 				},
 				success: true,
@@ -2741,12 +2729,6 @@ async function getUserPublicData(
 	env: Env,
 ): Promise<ResponseData> {
 	const db = drizzle(env.AUTH_DB);
-
-	const user_totp = await getUserMFATOTP({
-		db,
-		userID,
-		clientID,
-	});
 
 	const usersTable = OTFusersTable(clientID);
 	return db
@@ -2778,9 +2760,6 @@ async function getUserPublicData(
 					userInfo: {
 						...el.data,
 						role: el.role,
-						mfa: {
-							totp_enabled: user_totp?.verified ?? false,
-						},
 					},
 				},
 			} satisfies ResponseData;
@@ -2817,12 +2796,6 @@ async function updateUserPublicData({
 	}
 
 	const db = drizzle(env.AUTH_DB);
-
-	const user_totp = await getUserMFATOTP({
-		db,
-		clientID,
-		userID,
-	});
 
 	const mergedData: Record<string, unknown> | null = skipMerge
 		? newData
@@ -2864,9 +2837,6 @@ async function updateUserPublicData({
 					userInfo: {
 						...el.data,
 						role: el.role,
-						mfa: {
-							totp_enabled: user_totp?.verified ?? false,
-						},
 					},
 				},
 			} satisfies ResponseData;
@@ -2906,12 +2876,6 @@ async function updateUserPrivateData({
 
 	const db = drizzle(env.AUTH_DB);
 
-	const totp_user = await getUserMFATOTP({
-		db,
-		userID,
-		clientID,
-	});
-
 	return db
 		.update(usersTable)
 		.set({
@@ -2945,9 +2909,6 @@ async function updateUserPrivateData({
 					userInfo: {
 						...el.data,
 						role: el.role,
-						mfa: {
-							totp_enabled: totp_user?.verified ?? false,
-						},
 					},
 				},
 			} satisfies ResponseData;
