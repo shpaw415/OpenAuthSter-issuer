@@ -1,8 +1,7 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
-	"extends": "//",
+	"$schema": "node_modules/@biomejs/biome/configuration_schema.json",
 	"files": {
-		"includes": ["./src/**/*.{ts,tsx,mts}", "./openauth.config.ts"]
+		"includes": ["./src/**", "./openauth.config.ts", "./bin/**"]
 	},
 	"linter": {
 		"rules": {

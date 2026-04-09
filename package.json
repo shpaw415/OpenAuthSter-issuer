@@ -2,7 +2,7 @@
 	"name": "openauthster-issuer-server",
 	"description": "Deploy an OpenAuthSter issuer server on Cloudflare Workers.",
 	"module": "true",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"cloudflare": {
 		"label": "OpenAuthSter Issuer Server",
 		"products": [
@@ -16,7 +16,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.10",
-		"@cloudflare/workers-types": "^4.20260403.1",
+		"@cloudflare/workers-types": "^4.20260409.1",
 		"@types/bun": "latest",
 		"@types/mustache": "^4.2.6",
 		"@types/node": "^25.5.2",
@@ -25,7 +25,7 @@
 		"commander": "^14.0.3",
 		"drizzle-kit": "^0.31.10",
 		"typescript": "5.9.3",
-		"wrangler": "^4.80.0"
+		"wrangler": "^4.81.0"
 	},
 	"dependencies": {
 		"@cf-wasm/quickjs": "^0.2.4",
@@ -34,16 +34,16 @@
 		"@simplewebauthn/server": "^13.3.0",
 		"@types/semver": "^7.7.1",
 		"bcryptjs": "^3.0.3",
-		"dotenv": "^17.4.0",
+		"dotenv": "^17.4.1",
 		"drizzle-orm": "0.45.1",
-		"hono": "^4.12.10",
+		"hono": "^4.12.12",
 		"import": "^0.0.6",
 		"jose": "^6.2.2",
 		"mustache": "^4.2.0",
-		"openauth-webui-shared-types": "https://github.com/shpaw415/OpenAuthSter-shared.git#v1.0.1",
+		"openauth-webui-shared-types": "https://github.com/shpaw415/OpenAuthSter-shared.git#v1.1.0",
 		"otpauth": "^9.5.0",
 		"quickjs-emscripten": "^0.32.0",
-		"react": "^19.2.4",
+		"react": "^19.2.5",
 		"resend": "^6.10.0",
 		"semver": "^7.7.4",
 		"semver-compare": "^1.0.0",

@@ -1,6 +1,6 @@
-import { exec } from "child_process";
+import { exec } from "node:child_process";
+import { createInterface } from "node:readline";
 import { Command } from "commander";
-import { createInterface } from "readline";
 import packageJson, { version } from "../package.json";
 import { initializeFlow } from "./initFlow";
 import { upgradeFlow } from "./upgradeFlow";

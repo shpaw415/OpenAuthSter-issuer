@@ -50,7 +50,13 @@ import {
 	webauthnCredentialsTable,
 } from "openauth-webui-shared-types/database";
 import type { OTFUsersParsedType } from "openauth-webui-shared-types/database/types";
-import { and, drizzle, eq, or } from "openauth-webui-shared-types/drizzle";
+import {
+	and,
+	type DrizzleD1Database,
+	drizzle,
+	eq,
+	or,
+} from "openauth-webui-shared-types/drizzle";
 import {
 	type UserResponseSchemaType as _UserResponseSchemaType,
 	type GetUserListFilters,
@@ -2144,11 +2150,23 @@ endpoints.all("*", async (c) => {
 				database: c.env.AUTH_DB,
 			});
 
+			const user_totp_enabled =
+				userData.type === "register"
+					? false
+					: ((await getUserMFATOTP({
+							db: drizzle(c.env.AUTH_DB),
+							userID: userData.parser.data?.id as string,
+							clientID: project.clientID,
+						}).then((c) => c?.verified)) ?? false);
+
 			const res = ctx.subject("user", {
 				id: userData.parser.data?.id,
 				data: userData.dbUser?.data ?? {},
 				identifier: userData.dbUser?.identifier ?? "",
 				clientID: params.clientID as string,
+				mfa: {
+					totp_enabled: user_totp_enabled,
+				},
 				provider:
 					(userData.dbUser?.data?.provider as string) ??
 					(value.provider as Omit<ProviderType, "qr"> as string),
@@ -2160,7 +2178,11 @@ endpoints.all("*", async (c) => {
 		refresh: async (ctx, value) => {
 			const userTable = OTFusersTable(project.clientID);
 			const user = await drizzle(c.env.AUTH_DB)
-				.select({ role: userTable.role, data: userTable.data })
+				.select({
+					role: userTable.role,
+					data: userTable.data,
+					id: userTable.id,
+				})
 				.from(userTable)
 				.where(eq(userTable.id, value.properties.id))
 				.get();
@@ -2180,6 +2202,14 @@ endpoints.all("*", async (c) => {
 				...value.properties,
 				role: user.role,
 				data: user.data,
+				mfa: {
+					totp_enabled:
+						(await getUserMFATOTP({
+							db: drizzle(c.env.AUTH_DB),
+							userID: user.id,
+							clientID: project.clientID,
+						}).then((c) => c?.verified)) ?? false,
+				},
 			});
 		},
 		async error(error, req) {
@@ -2589,6 +2619,22 @@ function parseFilters(query: Record<string, string>): GetUserListFilters {
 	} as GetUserListFilters;
 }
 
+function getUserMFATOTP({
+	userID,
+	clientID,
+	db,
+}: {
+	userID: string;
+	clientID: string;
+	db: DrizzleD1Database<Record<string, never>> & { $client: D1Database };
+}) {
+	return db
+		.select({ verified: totpTable.is_verified })
+		.from(totpTable)
+		.where(and(eq(totpTable.user_id, userID), eq(totpTable.clientID, clientID)))
+		.get();
+}
+
 async function ensureToken({
 	token,
 	clientID,
@@ -2641,9 +2687,16 @@ async function getUserPrivateData({
 	clientID: string;
 	env: Env;
 }): Promise<ResponseData> {
-	const usersTable = OTFusersTable(clientID);
+	const db = drizzle(env.AUTH_DB);
 
-	return drizzle(env.AUTH_DB)
+	const user_totp = await getUserMFATOTP({
+		db,
+		userID,
+		clientID,
+	});
+
+	const usersTable = OTFusersTable(clientID);
+	return db
 		.select({
 			private: usersTable.session_private,
 			public: usersTable.session_public,
@@ -2669,20 +2722,34 @@ async function getUserPrivateData({
 					public: el.public ?? null,
 					user_id: el.id,
 					user_identifier: el.identifier,
-					userInfo: { ...el.data, role: el.role },
+					userInfo: {
+						...el.data,
+						role: el.role,
+						mfa: {
+							totp_enabled: user_totp?.verified ?? false,
+						},
+					},
 				},
 				success: true,
 			} satisfies ResponseData;
 		});
 }
 
-function getUserPublicData(
+async function getUserPublicData(
 	userID: string,
 	clientID: string,
 	env: Env,
 ): Promise<ResponseData> {
+	const db = drizzle(env.AUTH_DB);
+
+	const user_totp = await getUserMFATOTP({
+		db,
+		userID,
+		clientID,
+	});
+
 	const usersTable = OTFusersTable(clientID);
-	return drizzle(env.AUTH_DB)
+	return db
 		.select({
 			public: usersTable.session_public,
 			id: usersTable.id,
@@ -2708,7 +2775,13 @@ function getUserPublicData(
 					private: null,
 					user_id: el.id,
 					user_identifier: el.identifier,
-					userInfo: { ...el.data, role: el.role },
+					userInfo: {
+						...el.data,
+						role: el.role,
+						mfa: {
+							totp_enabled: user_totp?.verified ?? false,
+						},
+					},
 				},
 			} satisfies ResponseData;
 		})
@@ -2742,6 +2815,15 @@ async function updateUserPublicData({
 			error: "User not found",
 		};
 	}
+
+	const db = drizzle(env.AUTH_DB);
+
+	const user_totp = await getUserMFATOTP({
+		db,
+		clientID,
+		userID,
+	});
+
 	const mergedData: Record<string, unknown> | null = skipMerge
 		? newData
 		: deepMergeRecords(
@@ -2750,7 +2832,7 @@ async function updateUserPublicData({
 					: undefined,
 				newData,
 			);
-	return drizzle(env.AUTH_DB)
+	return db
 		.update(usersTable)
 		.set({
 			session_public: mergedData,
@@ -2779,7 +2861,13 @@ async function updateUserPublicData({
 					private: null,
 					user_id: userID,
 					user_identifier: el.identifier,
-					userInfo: { ...el.data, role: el.role },
+					userInfo: {
+						...el.data,
+						role: el.role,
+						mfa: {
+							totp_enabled: user_totp?.verified ?? false,
+						},
+					},
 				},
 			} satisfies ResponseData;
 		});
@@ -2815,7 +2903,16 @@ async function updateUserPrivateData({
 					: undefined,
 				newData,
 			);
-	return drizzle(env.AUTH_DB)
+
+	const db = drizzle(env.AUTH_DB);
+
+	const totp_user = await getUserMFATOTP({
+		db,
+		userID,
+		clientID,
+	});
+
+	return db
 		.update(usersTable)
 		.set({
 			session_private: mergedData,
@@ -2845,7 +2942,13 @@ async function updateUserPrivateData({
 					public: el.session_public,
 					user_id: userID,
 					user_identifier: el.identifier,
-					userInfo: { ...el.data, role: el.role },
+					userInfo: {
+						...el.data,
+						role: el.role,
+						mfa: {
+							totp_enabled: totp_user?.verified ?? false,
+						},
+					},
 				},
 			} satisfies ResponseData;
 		});
