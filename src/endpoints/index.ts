@@ -1245,7 +1245,8 @@ async function generateTOTP({
 	return {
 		totp: new TOTP({
 			issuer: project.clientID,
-			label,
+			issuerInLabel: false,
+			label: `${project.name}:${label}`,
 			secret: base32Secret,
 			algorithm: "SHA1",
 			digits: 6,
