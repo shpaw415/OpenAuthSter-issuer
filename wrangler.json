@@ -18,26 +18,11 @@
 			"new_sqlite_classes": ["QRHandshake"]
 		}
 	],
-	"d1_databases": [
-		{
-			"binding": "AUTH_DB",
-			"database_id": "fbd2f747-c950-48bc-8939-addccae17553",
-			"remote": true,
-			"migrations_dir": "drizzle/migrations"
-		}
-	],
+	"d1_databases": [],
 	"observability": {
 		"enabled": true
 	},
 	"compatibility_flags": ["nodejs_compat"],
-	"vars": {
-		"WEBUI_ADMIN_EMAILS": "justin@webcreas.com,john@webcreas.com",
-		"WEBUI_ORIGIN_URL": "http://localhost:3001,https://webui-test.webcreas.com",
-		"ISSUER_URL": "https://openauthster-test.shpaw400.workers.dev",
-		"LOG_ENABLED": "true",
-		"ACCESS_TTL": "900",
-		"REFRESH_TTL": "604800",
-		"EMAIL_FROM": "no-reply@mail.webcreas.com"
-	},
+	"vars": {},
 	"workers_dev": true
 }
